@@ -1,0 +1,35 @@
+"use client";
+
+import { ReactNode, useState } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { WagmiProvider } from "wagmi";
+import { wagmiConfig } from "@/wallet/config/wagmiConfig";
+
+/**
+ * EvmProvider wraps the application with Wagmi and React Query providers.
+ * 
+ * Future-proofing:
+ * - This phase is EVM-first (Injective inEVM).
+ * - If CosmWasm support is added later, a separate WasmProvider can be composed
+ *   in the root layout alongside this one.
+ */
+export function EvmProvider({ children }: { children: ReactNode }) {
+  // Ensure QueryClient is created only once per lifecycle to avoid hydration issues
+  const [queryClient] = useState(() => new QueryClient({
+    defaultOptions: {
+      queries: {
+        refetchOnWindowFocus: false,
+        retry: false,
+      },
+    },
+  }));
+
+  return (
+    <WagmiProvider config={wagmiConfig}>
+      <QueryClientProvider client={queryClient}>
+        {children}
+      </QueryClientProvider>
+    </WagmiProvider>
+  );
+}
+
