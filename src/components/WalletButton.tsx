@@ -6,13 +6,17 @@ import Image from "next/image";
 import { useMemo, useState } from "react";
 import { WalletModal } from "@/wallet/ui/WalletModal";
 import { useWalletController } from "@/wallet/hooks/useWalletController";
+import { useI18n } from "@/i18n";
 
 interface WalletButtonProps {
   className?: string;
   label?: string;
 }
 
-export const WalletButton = ({ className, label = "使用 INJ Pass 继续" }: WalletButtonProps) => {
+export const WalletButton = ({ className, label }: WalletButtonProps) => {
+  const { t } = useI18n();
+  const tw = t.wallet;
+  const buttonLabel = label ?? tw.continueLabel;
   const { state, actions } = useWalletController();
   const [showDropdown, setShowDropdown] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -70,11 +74,11 @@ export const WalletButton = ({ className, label = "使用 INJ Pass 继续" }: Wa
               <div className="fixed inset-0 z-10" onClick={() => setShowDropdown(false)} />
               <div className="absolute right-0 z-20 mt-2 w-72 rounded-lg border border-gray-200 bg-white py-2 shadow-2xl">
                 <div className="px-4 py-3 border-b border-gray-100">
-                  <div className="text-xs text-gray-500 mb-1">已连接地址</div>
+                  <div className="text-xs text-gray-500 mb-1">{tw.connectedAddress}</div>
                   <div className="font-mono text-sm text-gray-900 break-all">{state.address}</div>
                   {state.expectedChainName && (
                     <div className="text-xs text-gray-500 mt-2">
-                      网络：<span className="font-semibold text-gray-700">{state.expectedChainName}</span>
+                      {tw.network}：<span className="font-semibold text-gray-700">{state.expectedChainName}</span>
                     </div>
                   )}
                 </div>
@@ -86,12 +90,12 @@ export const WalletButton = ({ className, label = "使用 INJ Pass 继续" }: Wa
                   {copied ? (
                     <>
                       <CheckCircle className="w-4 h-4 text-green-600" />
-                      <span className="text-sm text-green-600 font-medium">已复制地址</span>
+                      <span className="text-sm text-green-600 font-medium">{t.common.copiedAddress}</span>
                     </>
                   ) : (
                     <>
                       <Copy className="w-4 h-4 text-gray-600" />
-                      <span className="text-sm text-gray-700">复制地址</span>
+                      <span className="text-sm text-gray-700">{t.common.copyAddress}</span>
                     </>
                   )}
                 </button>
@@ -104,7 +108,7 @@ export const WalletButton = ({ className, label = "使用 INJ Pass 继续" }: Wa
                   className="w-full px-4 py-3 flex items-center gap-3 hover:bg-red-50 transition-colors text-left border-t border-gray-100"
                 >
                   <LogOut className="w-4 h-4 text-red-600" />
-                  <span className="text-sm text-red-600 font-medium">断开连接</span>
+                  <span className="text-sm text-red-600 font-medium">{tw.disconnect}</span>
                 </button>
               </div>
             </>
@@ -124,9 +128,9 @@ export const WalletButton = ({ className, label = "使用 INJ Pass 继续" }: Wa
             {isBusy ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <span>{label}</span>
+              <span>{buttonLabel}</span>
             )}
-            {isBusy && <span className="ml-2.5">连接中...</span>}
+            {isBusy && <span className="ml-2.5">{t.common.connecting}</span>}
           </div>
         </button>
       )}

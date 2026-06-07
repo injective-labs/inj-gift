@@ -11,6 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@injpass/cli": "file:../inj-pass-frontend/packages/injpass-connector",
     "@cosmjs/cosmwasm-stargate": "^0.38.1",
     "@cosmjs/crypto": "^0.38.1",
     "@cosmjs/encoding": "^0.38.1",

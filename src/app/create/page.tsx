@@ -9,8 +9,11 @@ import { useTx } from "../../hooks/useTx";
 import { Modal } from "../../components/Modal";
 import { shortenId } from "../../lib/utils";
 import { ArrowLeft, Gift, Loader2, Sparkles, Clock, Coins, Key, Zap, Copy, Check, Share2 } from "lucide-react";
+import { useI18n, errorMessage } from "@/i18n";
 
 export default function CreatePage() {
+  const { t: dict } = useI18n();
+  const { create: tc, form, common, errors } = dict;
   const { adapter } = useGiftAdapter();
   const { run: runTx, state: txState } = useTx();
   const router = useRouter();
@@ -69,32 +72,32 @@ export default function CreatePage() {
 
   const handleCreate = async () => {
     if (!password.trim()) {
-      toast.error("请输入口令");
+      toast.error(errors.enterPasscode);
       return;
     }
     if (!Number.isFinite(count) || count <= 0) {
-      toast.error("数量不合法");
+      toast.error(errors.invalidCount);
       return;
     }
     let amountBase = "";
     try {
       amountBase = toBaseUnits(amountInj);
       if (BigInt(amountBase) <= 0n) {
-        toast.error("金额必须大于 0");
+        toast.error(errors.amountPositive);
         return;
       }
     } catch {
-      toast.error("金额格式不合法");
+      toast.error(errors.invalidAmount);
       return;
     }
     const expiryTs = Date.parse(expiresAt);
     if (!Number.isFinite(expiryTs)) {
-      toast.error("过期时间不合法");
+      toast.error(errors.invalidExpiry);
       return;
     }
     const durationSec = Math.floor((expiryTs - Date.now()) / 1000);
     if (durationSec <= 0) {
-      toast.error("过期时间必须在未来");
+      toast.error(errors.expiryFuture);
       return;
     }
 
@@ -123,10 +126,10 @@ export default function CreatePage() {
         setCreatedPacketId(packetId ?? null);
         if (packetId) saveMyPacket(packetId, txHashValue ?? txHash);
         setSuccessOpen(true);
-        toast.success(`创建成功: ${txHash.slice(0, 10)}...`);
+        toast.success(`${errors.createSuccess}: ${txHash.slice(0, 10)}...`);
       }
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "创建失败");
+      toast.error(errorMessage(e, dict) || errors.createFailed);
     }
   };
 
@@ -147,7 +150,7 @@ export default function CreatePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-red-50 via-orange-50 to-yellow-50 relative overflow-hidden">
-      {/* 装饰性背景元素 */}
+      {/* Decorative background elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-20 left-10 w-72 h-72 bg-red-200 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse-slow"></div>
         <div className="absolute bottom-20 right-10 w-72 h-72 bg-orange-200 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse-slow" style={{ animationDelay: '1s' }}></div>
@@ -158,7 +161,7 @@ export default function CreatePage() {
         <div className="flex justify-between items-center mb-8">
           <Link href="/" className="group flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-all">
             <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-            <span className="font-medium">返回首页</span>
+            <span className="font-medium">{common.backHome}</span>
           </Link>
           <WalletButton />
         </div>
@@ -175,8 +178,8 @@ export default function CreatePage() {
                 <Sparkles className="w-5 h-5 text-yellow-400 absolute -top-1 -right-1 animate-pulse" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold gradient-text">创建红包</h1>
-                <p className="text-gray-500 text-sm mt-1">填写信息，分享快乐</p>
+                <h1 className="text-3xl font-bold gradient-text">{tc.title}</h1>
+                <p className="text-gray-500 text-sm mt-1">{tc.subtitle}</p>
               </div>
             </div>
 
@@ -185,7 +188,7 @@ export default function CreatePage() {
               <div className="group">
                 <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-3">
                   <Coins className="w-4 h-4 text-red-500" />
-                  总金额（INJ）
+                  {form.amountInj}
                 </label>
                 <div className="relative">
                   <input
@@ -197,18 +200,18 @@ export default function CreatePage() {
                   />
                   <Coins className="w-5 h-5 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2" />
                 </div>
-                <p className="text-xs text-gray-500 mt-2 ml-1">💡 示例：0.1 INJ</p>
+                <p className="text-xs text-gray-500 mt-2 ml-1">{tc.amountHint}</p>
               </div>
 
               {/* Token */}
               <div className="group">
                 <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-3">
                   <Zap className="w-4 h-4 text-orange-500" />
-                  Token 类型
+                  {form.token}
                 </label>
                 <input
                   className="w-full px-4 py-4 border-2 border-gray-200 rounded-xl focus:border-orange-400 focus:ring-4 focus:ring-orange-100 outline-none transition-all group-hover:border-gray-300"
-                  placeholder="INJ 或 CW20 合约地址"
+                  placeholder={form.tokenPlaceholder}
                   value={denomOrCw20}
                   onChange={(e) => setDenomOrCw20(e.target.value)}
                 />
@@ -219,7 +222,7 @@ export default function CreatePage() {
                 <div className="group">
                   <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-3">
                     <Gift className="w-4 h-4 text-red-500" />
-                    红包数量
+                    {form.count}
                   </label>
                   <input
                     className="w-full px-4 py-4 border-2 border-gray-200 rounded-xl focus:border-red-400 focus:ring-4 focus:ring-red-100 outline-none transition-all group-hover:border-gray-300 text-lg"
@@ -232,7 +235,7 @@ export default function CreatePage() {
                 <div className="group">
                   <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-3">
                     <Clock className="w-4 h-4 text-blue-500" />
-                    过期时间
+                    {form.expiry}
                   </label>
                   <input
                     className="w-full px-4 py-4 border-2 border-gray-200 rounded-xl focus:border-blue-400 focus:ring-4 focus:ring-blue-100 outline-none transition-all group-hover:border-gray-300 text-lg"
@@ -247,12 +250,12 @@ export default function CreatePage() {
               <div className="group">
                 <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-3">
                   <Key className="w-4 h-4 text-yellow-500" />
-                  口令
+                  {form.passcodeShort}
                 </label>
                 <div className="relative">
                   <input
                     className="w-full px-4 py-4 pl-12 border-2 border-gray-200 rounded-xl focus:border-yellow-400 focus:ring-4 focus:ring-yellow-100 outline-none transition-all text-lg group-hover:border-gray-300"
-                    placeholder="设置领取口令（例如：恭喜发财）"
+                    placeholder={tc.passcodePlaceholder}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                   />
@@ -264,7 +267,7 @@ export default function CreatePage() {
               <div>
                 <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-3">
                   <Sparkles className="w-4 h-4 text-purple-500" />
-                  分配模式
+                  {form.splitMode}
                 </label>
                 <div className="grid grid-cols-2 gap-4">
                   <button
@@ -277,8 +280,8 @@ export default function CreatePage() {
                     }`}
                   >
                     <div className="text-4xl mb-2">🎲</div>
-                    <div className="font-bold text-lg mb-1">随机金额</div>
-                    <div className="text-sm text-gray-600">拼手气红包</div>
+                    <div className="font-bold text-lg mb-1">{form.randomAmount}</div>
+                    <div className="text-sm text-gray-600">{tc.randomDesc}</div>
                   </button>
                   <button
                     type="button"
@@ -290,8 +293,8 @@ export default function CreatePage() {
                     }`}
                   >
                     <div className="text-4xl mb-2">⚖️</div>
-                    <div className="font-bold text-lg mb-1">均等分配</div>
-                    <div className="text-sm text-gray-600">公平红包</div>
+                    <div className="font-bold text-lg mb-1">{form.equalSplit}</div>
+                    <div className="text-sm text-gray-600">{tc.equalDesc}</div>
                   </button>
                 </div>
               </div>
@@ -306,12 +309,12 @@ export default function CreatePage() {
                 {isLoading ? (
                   <>
                     <Loader2 className="w-6 h-6 animate-spin" />
-                    创建中，请稍候...
+                    {tc.submitting}
                   </>
                 ) : (
                   <>
                     <Gift className="w-6 h-6" />
-                    立即创建红包
+                    {tc.submit}
                     <Sparkles className="w-5 h-5 animate-pulse" />
                   </>
                 )}
@@ -322,10 +325,10 @@ export default function CreatePage() {
                 <div className="flex gap-3">
                   <div className="text-2xl">💡</div>
                   <div className="flex-1 text-sm text-gray-700 space-y-1">
-                    <p className="font-semibold text-blue-700">温馨提示</p>
-                    <p>• 红包创建后无法撤销，请仔细核对信息</p>
-                    <p>• 红包将根据设置的有效期自动过期</p>
-                    <p>• 请妥善保管红包口令，分享给好友领取</p>
+                    <p className="font-semibold text-blue-700">{tc.tipsTitle}</p>
+                    <p>{tc.tip1}</p>
+                    <p>{tc.tip2}</p>
+                    <p>{tc.tip3}</p>
                   </div>
                 </div>
               </div>
@@ -336,13 +339,13 @@ export default function CreatePage() {
 
       <Modal
         open={successOpen}
-        title="创建成功"
+        title={tc.successTitle}
         onClose={() => setSuccessOpen(false)}
       >
         <div className="space-y-4">
           {createdPacketId ? (
             <div className="rounded-2xl bg-emerald-50 p-4 border border-emerald-100">
-              <div className="text-xs font-semibold text-emerald-700">红包 ID</div>
+              <div className="text-xs font-semibold text-emerald-700">{form.packetId}</div>
               <div className="mt-2 flex items-center gap-2 rounded-xl bg-white/80 px-3 py-2">
                 <span className="text-xs font-mono text-emerald-900/80 truncate">
                   {createdPacketId}
@@ -353,7 +356,7 @@ export default function CreatePage() {
                   className="ml-auto inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:text-emerald-900"
                 >
                   {copiedId ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                  {copiedId ? "已复制" : "复制"}
+                  {copiedId ? common.copied : common.copy}
                 </button>
               </div>
               <div className="mt-3 flex items-center gap-2 rounded-xl bg-white/80 px-3 py-2">
@@ -366,23 +369,23 @@ export default function CreatePage() {
                   className="ml-auto inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:text-emerald-900"
                 >
                   {copiedLink ? <Check className="w-3 h-3" /> : <Share2 className="w-3 h-3" />}
-                  {copiedLink ? "已复制" : "复制链接"}
+                  {copiedLink ? common.copied : common.copyLink}
                 </button>
               </div>
               <div className="mt-2 text-xs text-emerald-700">
-                分享链接给好友，他们只需要输入口令即可领取。
+                {tc.shareHint}
               </div>
             </div>
           ) : (
             <div className="rounded-2xl bg-amber-50 p-4 border border-amber-100">
-              <div className="text-sm font-semibold text-amber-900">已创建，但未解析到红包 ID</div>
-              <div className="mt-1 text-xs text-amber-700">请稍后在详情页或区块浏览器查看。</div>
+              <div className="text-sm font-semibold text-amber-900">{tc.noPacketIdTitle}</div>
+              <div className="mt-1 text-xs text-amber-700">{tc.noPacketIdHint}</div>
             </div>
           )}
 
           {createdTxHash && (
             <div className="rounded-2xl bg-gray-50 p-4 border border-gray-100">
-              <div className="text-xs font-semibold text-gray-600">交易哈希</div>
+              <div className="text-xs font-semibold text-gray-600">{common.txHash}</div>
               <div className="mt-2 text-sm font-mono text-gray-900">
                 {shortenId(createdTxHash, 10)}
               </div>
@@ -396,7 +399,7 @@ export default function CreatePage() {
                 onClick={() => router.push(`/packet/${createdPacketId}`)}
                 className="flex-1 rounded-xl bg-emerald-600 text-white font-semibold py-3 hover:bg-emerald-700 transition-colors"
               >
-                查看红包详情
+                {common.viewPacketDetail}
               </button>
             )}
             <button
@@ -404,7 +407,7 @@ export default function CreatePage() {
               onClick={() => setSuccessOpen(false)}
               className="flex-1 rounded-xl bg-gray-100 text-gray-700 font-semibold py-3 hover:bg-gray-200 transition-colors"
             >
-              关闭
+              {common.close}
             </button>
           </div>
         </div>

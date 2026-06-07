@@ -13,6 +13,12 @@ export type AppErrorCode =
 export type AppError = {
   code: AppErrorCode;
   message: string;
+  /**
+   * Stable key into the i18n `errors` dictionary. When set, the UI renders the
+   * localized message for this key instead of `message` (which stays as a
+   * non-localized fallback for logs/tests/contexts without a translator).
+   */
+  messageKey?: string;
   cause?: unknown;
   data?: Record<string, unknown>;
 };
@@ -20,10 +26,11 @@ export type AppError = {
 export const appError = (
   code: AppErrorCode,
   message: string,
-  extras?: { cause?: unknown; data?: Record<string, unknown> },
+  extras?: { cause?: unknown; data?: Record<string, unknown>; messageKey?: string },
 ): AppError => ({
   code,
   message,
+  messageKey: extras?.messageKey,
   cause: extras?.cause,
   data: extras?.data,
 });

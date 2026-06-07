@@ -5,19 +5,19 @@ export const normalizeError = (e: unknown): AppError => {
   if (isAppError(e)) {
     const msg = typeof e.message === "string" ? e.message.toLowerCase() : "";
     if (msg.includes("already-claimed")) {
-      return appError("INVALID_INPUT", "该地址已领取过这个红包", { cause: e });
+      return appError("INVALID_INPUT", "该地址已领取过这个红包", { cause: e, messageKey: "alreadyClaimed" });
     }
     if (msg.includes("packet-inactive")) {
-      return appError("INVALID_INPUT", "红包已结束或不可领取", { cause: e });
+      return appError("INVALID_INPUT", "红包已结束或不可领取", { cause: e, messageKey: "packetInactive" });
     }
     if (msg.includes("bad-password")) {
-      return appError("INVALID_INPUT", "口令错误", { cause: e });
+      return appError("INVALID_INPUT", "口令错误", { cause: e, messageKey: "badPassword" });
     }
     if (msg.includes("packet-expired")) {
-      return appError("INVALID_INPUT", "红包已过期", { cause: e });
+      return appError("INVALID_INPUT", "红包已过期", { cause: e, messageKey: "packetExpired" });
     }
     if (msg.includes("packet-not-found")) {
-      return appError("NOT_FOUND", "红包不存在", { cause: e });
+      return appError("NOT_FOUND", "红包不存在", { cause: e, messageKey: "packetNotFound" });
     }
     return e;
   }
@@ -29,35 +29,35 @@ export const normalizeError = (e: unknown): AppError => {
     const msg = typeof anyE.message === "string" ? anyE.message : undefined;
 
     if (code === 4001 || (msg && msg.toLowerCase().includes("user rejected"))) {
-      return appError("USER_REJECTED", "User rejected the request", { cause: e });
+      return appError("USER_REJECTED", "User rejected the request", { cause: e, messageKey: "userRejected" });
     }
 
     if (msg && msg.toLowerCase().includes("insufficient funds")) {
-      return appError("INSUFFICIENT_FUNDS", "Insufficient funds", { cause: e });
+      return appError("INSUFFICIENT_FUNDS", "Insufficient funds", { cause: e, messageKey: "insufficientFunds" });
     }
 
     if (msg && msg.toLowerCase().includes("wrong network")) {
-      return appError("WRONG_NETWORK", msg, { cause: e });
+      return appError("WRONG_NETWORK", msg, { cause: e, messageKey: "wrongNetwork" });
     }
 
     if (msg && msg.toLowerCase().includes("already-claimed")) {
-      return appError("INVALID_INPUT", "该地址已领取过这个红包", { cause: e });
+      return appError("INVALID_INPUT", "该地址已领取过这个红包", { cause: e, messageKey: "alreadyClaimed" });
     }
 
     if (msg && msg.toLowerCase().includes("provider not found")) {
       return appError(
         "NOT_SUPPORTED",
         "Wallet provider not found. Please install or enable the wallet extension.",
-        { cause: e },
+        { cause: e, messageKey: "providerNotFound" },
       );
     }
 
     if (msg && msg.toLowerCase().includes("missing revert data")) {
-      return appError("REVERT", "交易被拒绝或条件不满足", { cause: e });
+      return appError("REVERT", "交易被拒绝或条件不满足", { cause: e, messageKey: "revertRejected" });
     }
 
     if (msg && msg.toLowerCase().includes("call_exception")) {
-      return appError("REVERT", "交易失败（合约拒绝执行）", { cause: e });
+      return appError("REVERT", "交易失败（合约拒绝执行）", { cause: e, messageKey: "revertFailed" });
     }
 
     if (msg && msg.toLowerCase().includes("revert")) {

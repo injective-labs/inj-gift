@@ -5,6 +5,7 @@ import { useAccount, useConnect, useDisconnect, useSwitchChain, useChainId } fro
 import { normalizeError } from "@/domain/normalizeError";
 import { appError } from "@/domain/errors";
 import { getEvmConfigOrThrow } from "@/stacks/evm/config";
+import { connectInjpass } from "@/wallet/injpass/provider";
 import type { WalletController, WalletControllerState } from "../controller/walletController.types";
 
 const walletIdToConnectorId = (id: string) => {
@@ -17,6 +18,10 @@ const walletIdToConnectorId = (id: string) => {
       return "walletConnect";
     case "coinbase":
       return "coinbaseWallet";
+    case "injpass":
+      // INJ Pass installs its EIP-1193 provider on window.ethereum, which the
+      // generic injected connector then picks up.
+      return "injected";
     default:
       return id;
   }
@@ -105,6 +110,13 @@ export function useWalletController(): WalletController {
           setUiStatus("connected");
           setModalOpen(false);
           return;
+        }
+
+        // INJ Pass: spin up the embedded wallet (iframe + passkey popup) and
+        // install its provider on window.ethereum before the injected connector
+        // reads it.
+        if (walletId === "injpass") {
+          await connectInjpass();
         }
 
         const connectorId = walletIdToConnectorId(walletId);

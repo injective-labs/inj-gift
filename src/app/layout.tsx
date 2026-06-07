@@ -3,6 +3,7 @@ import { ReactNode } from "react";
 import { TxToast } from "../components/TxToast";
 import { WalletProvider } from "../providers/WalletProvider";
 import { EvmProvider } from "../providers/EvmProvider";
+import { I18nProvider } from "@/i18n";
 import localFont from "next/font/local";
 
 const bodyFont = localFont({
@@ -45,8 +46,8 @@ const displayFont = localFont({
 });
 
 export const metadata = {
-  title: "InjGift - Injective 红包",
-  description: "基于 Injective 的加密红包系统",
+  title: "InjGift · Injective Red Packets",
+  description: "A crypto red-packet app built on Injective",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
@@ -55,12 +56,14 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body
         className={`${bodyFont.variable} ${displayFont.variable} min-h-screen antialiased`}
       >
-        <EvmProvider>
-          <WalletProvider>
-            {children}
-            <TxToast />
-          </WalletProvider>
-        </EvmProvider>
+        <I18nProvider>
+          <EvmProvider>
+            <WalletProvider>
+              {children}
+              <TxToast />
+            </WalletProvider>
+          </EvmProvider>
+        </I18nProvider>
       </body>
     </html>
   );

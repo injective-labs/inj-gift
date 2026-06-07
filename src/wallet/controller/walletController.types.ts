@@ -20,7 +20,8 @@ export type WalletDescriptor = {
   id: string;
   name: string;
   logoSrc?: string;
-  hint?: string;
+  /** Stable key into the i18n `wallet.hints` dictionary, translated at render. */
+  hintKey?: string;
   recommended?: boolean;
   enabled?: boolean;
 };

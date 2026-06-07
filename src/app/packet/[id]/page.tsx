@@ -14,8 +14,11 @@ import {
 import { useTx } from "../../../hooks/useTx";
 import { toast } from "sonner";
 import { normalizeError } from "../../../domain/normalizeError";
+import { useI18n, errorMessage } from "@/i18n";
 
 export default function PacketDetailPage() {
+  const { t: dict } = useI18n();
+  const { packetDetail: tp, common, errors, status, form } = dict;
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [data, setData] = useState<GiftPacket | null>(null);
@@ -49,7 +52,7 @@ export default function PacketDetailPage() {
     }
 
     if (isEvm && !isBytes32Hex(id)) {
-      setError({ message: "红包 ID 格式不正确：必须是 0x + 64 位十六进制（bytes32）" });
+      setError({ message: errors.invalidPacketId });
       setData(null);
       return;
     }
@@ -61,11 +64,11 @@ export default function PacketDetailPage() {
       setError(null);
     } catch (e: any) {
       console.error("Fetch packet failed:", e);
-      setError(e);
+      setError({ message: errorMessage(e, dict) });
     } finally {
       setIsLoading(false);
     }
-  }, [id, adapter, isDemo, isLoading, isEvm]);
+  }, [id, adapter, isDemo, isLoading, isEvm, dict, errors.invalidPacketId]);
 
   useEffect(() => {
     fetchPacket();
@@ -178,11 +181,11 @@ export default function PacketDetailPage() {
         const res = await adapter.refundPacket(data.id);
         return { hash: res.hash };
       });
-      toast.success("退款已发起");
+      toast.success(errors.refundInitiated);
       fetchPacket();
     } catch (e: any) {
       const err = normalizeError(e);
-      toast.error(err.message || "退款失败");
+      toast.error(errorMessage(err, dict) || errors.refundFailed);
     }
   };
 
@@ -204,7 +207,7 @@ export default function PacketDetailPage() {
             className="group flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-all"
           >
             <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-            <span className="font-medium">返回</span>
+            <span className="font-medium">{common.back}</span>
           </button>
           <WalletButton />
         </div>
@@ -220,14 +223,14 @@ export default function PacketDetailPage() {
                   <Sparkles className="w-5 h-5 text-orange-400 absolute -top-1 -right-1 animate-pulse" />
                 </div>
                 <div>
-                  <h1 className="text-3xl font-bold gradient-text">红包详情</h1>
-                  <p className="text-gray-500 text-sm mt-1">查看红包状态和领取记录</p>
+                  <h1 className="text-3xl font-bold gradient-text">{tp.title}</h1>
+                  <p className="text-gray-500 text-sm mt-1">{tp.subtitle}</p>
                 </div>
               </div>
               <button
                 onClick={() => fetchPacket()}
                 className="p-3 hover:bg-gray-100 rounded-xl transition-colors"
-                title="刷新"
+                title={common.refresh}
               >
                 <RefreshCw className="w-5 h-5 text-gray-600" />
               </button>
@@ -236,7 +239,7 @@ export default function PacketDetailPage() {
             {isLoading && (
               <div className="flex flex-col items-center justify-center py-16 space-y-4">
                 <Loader2 className="w-12 h-12 text-yellow-500 animate-spin" />
-                <p className="text-gray-600 font-medium">正在加载红包信息...</p>
+                <p className="text-gray-600 font-medium">{common.loadingPacket}</p>
               </div>
             )}
 
@@ -245,7 +248,7 @@ export default function PacketDetailPage() {
                 <div className="flex items-center gap-3">
                   <AlertCircle className="w-6 h-6 text-red-600" />
                   <div>
-                    <p className="font-semibold text-red-900">加载失败</p>
+                    <p className="font-semibold text-red-900">{errors.loadFailed}</p>
                     <p className="text-sm text-red-700">{error.message}</p>
                   </div>
                 </div>
@@ -257,7 +260,7 @@ export default function PacketDetailPage() {
                 {isDemo ? (
                   <div className="space-y-4">
                     <div className="rounded-2xl border border-amber-100 bg-amber-50/70 p-5">
-                      <div className="text-sm font-semibold text-amber-700">资产</div>
+                      <div className="text-sm font-semibold text-amber-700">{tp.asset}</div>
                       <div className="mt-2 text-2xl font-bold text-amber-900">INJ</div>
                       <div className="mt-3 flex items-center gap-2 rounded-xl bg-white/80 px-3 py-2">
                         <span className="text-xs font-mono text-amber-900/80 truncate">
@@ -268,12 +271,12 @@ export default function PacketDetailPage() {
                           className="ml-auto inline-flex items-center gap-1 text-xs font-semibold text-amber-700 hover:text-amber-900"
                         >
                           {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                          {copied ? "已复制" : "复制币地址"}
+                          {copied ? common.copied : common.copyTokenAddress}
                         </button>
                       </div>
                     </div>
                     <div className="rounded-2xl border border-gray-100 bg-white/90 p-5">
-                      <div className="text-sm font-semibold text-gray-700 mb-4">领取记录</div>
+                      <div className="text-sm font-semibold text-gray-700 mb-4">{tp.claimRecords}</div>
                       <div className="space-y-3">
                         {demoClaims.map((item, index) => (
                           <div
@@ -292,62 +295,62 @@ export default function PacketDetailPage() {
                 ) : (
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="rounded-2xl border border-gray-100 bg-white/95 p-5">
-                      <div className="text-xs font-semibold text-gray-500">红包状态</div>
+                      <div className="text-xs font-semibold text-gray-500">{tp.statusLabel}</div>
                       <div className="mt-2 text-lg font-bold text-gray-900">
                         {derivedStatus === "active"
-                          ? "进行中"
+                          ? status.active
                           : derivedStatus === "refunded"
-                            ? "已退款"
+                            ? status.refunded
                           : derivedStatus === "expired"
-                            ? "已过期"
+                            ? status.expired
                             : derivedStatus === "claimed_out"
-                              ? "已领完"
-                              : "不可用"}
+                              ? status.claimedOut
+                              : status.inactive}
                       </div>
                       <div className="mt-3 text-xs text-gray-500">
-                        过期时间: {new Date(data.expiration * 1000).toLocaleString()}
+                        {tp.expiryTime}: {new Date(data.expiration * 1000).toLocaleString()}
                       </div>
                     </div>
                     <div className="rounded-2xl border border-gray-100 bg-white/95 p-5">
-                      <div className="text-xs font-semibold text-gray-500">创建者</div>
+                      <div className="text-xs font-semibold text-gray-500">{tp.creator}</div>
                       <div className="mt-2 text-sm font-mono text-gray-900 break-all">
                         {data.creator}
                       </div>
                     </div>
                     <div className="rounded-2xl border border-gray-100 bg-white/95 p-5">
-                      <div className="text-xs font-semibold text-gray-500">当前钱包</div>
+                      <div className="text-xs font-semibold text-gray-500">{tp.currentWallet}</div>
                       <div className="mt-2 text-sm font-mono text-gray-900 break-all">
-                        {address ?? "未连接"}
+                        {address ?? common.notConnected}
                       </div>
                       {!address && (
                         <div className="mt-2 text-xs text-amber-700">
-                          请先连接钱包，否则无法判断是否显示退款按钮。
+                          {tp.connectWalletHint}
                         </div>
                       )}
                       {address && !isCreator && derivedStatus === "expired" && (
                         <div className="mt-2 text-xs text-amber-700">
-                          当前地址不是创建者，退款按钮不会显示。
+                          {tp.notCreatorHint}
                         </div>
                       )}
                     </div>
                     <div className="rounded-2xl border border-gray-100 bg-white/95 p-5">
-                      <div className="text-xs font-semibold text-gray-500">总金额 / 已领取 / 剩余</div>
+                      <div className="text-xs font-semibold text-gray-500">{tp.amountSummary}</div>
                       <div className="mt-2 text-sm text-gray-900">
                         {formatInj(data.totalAmount)} / {formatInj(data.claimedAmount)} /{" "}
                         {remainingAmount === null ? "--" : formatInj(remainingAmount.toString())} INJ
                       </div>
                     </div>
                     <div className="rounded-2xl border border-gray-100 bg-white/95 p-5">
-                      <div className="text-xs font-semibold text-gray-500">红包数量 / 已领取</div>
+                      <div className="text-xs font-semibold text-gray-500">{tp.countSummary}</div>
                       <div className="mt-2 text-sm text-gray-900">
                         {data.totalCount} / {data.claimedCount}
                       </div>
-                      <div className="mt-1 text-xs text-gray-500">模式: {data.mode === "random" ? "随机" : "均分"}</div>
+                      <div className="mt-1 text-xs text-gray-500">{tp.modeLabel}: {data.mode === "random" ? form.random : form.equal}</div>
                     </div>
                     <div className="md:col-span-2 rounded-2xl border border-gray-100 bg-white/95 p-5">
-                      <div className="text-xs font-semibold text-gray-500">资产</div>
+                      <div className="text-xs font-semibold text-gray-500">{tp.asset}</div>
                       <div className="mt-2 text-sm font-mono text-gray-900 break-all">
-                        {isNativeToken ? "INJ (native)" : data.token}
+                        {isNativeToken ? common.nativeInj : data.token}
                       </div>
                     </div>
                   </div>
@@ -360,7 +363,7 @@ export default function PacketDetailPage() {
                         href={`/claim/${data.id}`}
                         className="inline-flex items-center justify-center rounded-xl bg-emerald-600 text-white font-semibold px-5 py-3 hover:bg-emerald-700 transition-colors"
                       >
-                        去领取
+                        {tp.goClaim}
                       </Link>
                     )}
                     {canRefund && (
@@ -370,7 +373,7 @@ export default function PacketDetailPage() {
                         disabled={refundLoading}
                         className="inline-flex items-center justify-center rounded-xl bg-amber-600 text-white font-semibold px-5 py-3 hover:bg-amber-700 transition-colors disabled:opacity-50"
                       >
-                        {refundLoading ? "退款中..." : "过期退款"}
+                        {refundLoading ? tp.refunding : tp.refund}
                       </button>
                     )}
                   </div>

@@ -6,6 +6,7 @@ import clsx from "clsx";
 import { EVM_WALLETS } from "../config/wallets";
 import { WalletItem } from "./WalletItem";
 import type { WalletControllerState, WalletControllerActions } from "../controller/walletController.types";
+import { useI18n, errorMessage } from "@/i18n";
 
 export function WalletModal({
   state,
@@ -14,7 +15,10 @@ export function WalletModal({
   state: WalletControllerState;
   actions: WalletControllerActions;
 }) {
+  const { t: dict } = useI18n();
+  const tw = dict.wallet;
   const isBusy = state.status === "connecting" || state.status === "switching_network";
+  const hints = tw.hints as Record<string, string>;
 
   return (
     <Dialog.Root open={state.isModalOpen} onOpenChange={(o) => (o ? actions.openModal() : actions.closeModal())}>
@@ -29,9 +33,9 @@ export function WalletModal({
         >
           <div className="px-6 py-5 border-b border-gray-100 flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <Dialog.Title className="text-lg font-bold text-gray-900">连接钱包</Dialog.Title>
+              <Dialog.Title className="text-lg font-bold text-gray-900">{tw.modalTitle}</Dialog.Title>
               <Dialog.Description className="text-sm text-gray-500 mt-1">
-                选择一个 EVM 钱包继续使用 Injective inEVM。
+                {tw.modalDesc}
               </Dialog.Description>
             </div>
             <Dialog.Close asChild>
@@ -51,7 +55,7 @@ export function WalletModal({
             <div className="px-6 py-4 bg-gray-50 border-b border-gray-100 flex items-center gap-3">
               <Loader2 className="w-5 h-5 animate-spin text-gray-700" />
               <div className="text-sm font-medium text-gray-800">
-                {state.status === "connecting" ? "连接中..." : "正在切换网络..."}
+                {state.status === "connecting" ? dict.common.connecting : tw.switchingNetwork}
               </div>
             </div>
           )}
@@ -62,15 +66,15 @@ export function WalletModal({
               <div className="flex items-start gap-3">
                 <AlertCircle className="w-5 h-5 text-red-600 mt-0.5" />
                 <div className="min-w-0">
-                  <div className="text-sm font-semibold text-red-900">连接失败</div>
-                  <div className="text-sm text-red-700 mt-1 break-words">{state.error.message}</div>
+                  <div className="text-sm font-semibold text-red-900">{tw.connectFailed}</div>
+                  <div className="text-sm text-red-700 mt-1 break-words">{errorMessage(state.error, dict)}</div>
                   <div className="mt-3 flex gap-2">
                     <button
                       type="button"
                       onClick={actions.resetError}
                       className="px-3 py-2 rounded-xl bg-white border border-red-200 text-red-700 text-sm font-semibold hover:bg-red-50"
                     >
-                      知道了
+                      {tw.gotIt}
                     </button>
                     {state.expectedChainId && state.chainId && state.chainId !== state.expectedChainId && (
                       <button
@@ -79,7 +83,7 @@ export function WalletModal({
                         disabled={isBusy}
                         className="px-3 py-2 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-700 disabled:opacity-50"
                       >
-                        切换网络
+                        {tw.switchNetwork}
                       </button>
                     )}
                   </div>
@@ -93,7 +97,7 @@ export function WalletModal({
               <WalletItem
                 key={w.id}
                 title={w.name}
-                hint={w.hint}
+                hint={w.hintKey ? hints[w.hintKey] : undefined}
                 recommended={w.recommended}
                 disabled={isBusy || w.enabled === false}
                 onClick={() => actions.connect(w.id)}
@@ -104,10 +108,10 @@ export function WalletModal({
           <div className="px-6 pb-6 text-xs text-gray-500">
             {state.expectedChainName ? (
               <div>
-                Network: <span className="font-semibold text-gray-700">{state.expectedChainName}</span>
+                {tw.network}: <span className="font-semibold text-gray-700">{state.expectedChainName}</span>
               </div>
             ) : (
-              <div>Network will be selected from env.</div>
+              <div>{tw.networkFromEnv}</div>
             )}
           </div>
         </Dialog.Content>

@@ -7,8 +7,11 @@ import { ArrowLeft, Key, Search } from "lucide-react";
 import { toast } from "sonner";
 import { isBytes32Hex } from "../../lib/utils";
 import { useGiftAdapter } from "../../hooks/useGiftAdapter";
+import { useI18n } from "@/i18n";
 
 export default function ClaimIndexPage() {
+  const { t } = useI18n();
+  const { claimIndex: tc, form, common, errors } = t;
   const router = useRouter();
   const { adapter } = useGiftAdapter();
   const isEvm = adapter.stack === "evm";
@@ -18,11 +21,11 @@ export default function ClaimIndexPage() {
   const goClaim = () => {
     const id = packetId.trim();
     if (!id) {
-      toast.error("请输入红包 ID");
+      toast.error(errors.enterPacketId);
       return;
     }
     if (isEvm && !isBytes32Hex(id)) {
-      toast.error("红包 ID 格式不正确：必须是 0x + 64 位十六进制（bytes32）");
+      toast.error(errors.invalidPacketId);
       return;
     }
     router.push(`/claim/${id}`);
@@ -45,7 +48,7 @@ export default function ClaimIndexPage() {
             className="group flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-all"
           >
             <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-            <span className="font-medium">返回首页</span>
+            <span className="font-medium">{common.backHome}</span>
           </Link>
           <WalletButton />
         </div>
@@ -57,8 +60,8 @@ export default function ClaimIndexPage() {
                 <Search className="w-7 h-7 text-white" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold gradient-text">领取红包</h1>
-                <p className="text-gray-500 text-sm mt-1">输入红包 ID 前往领取</p>
+                <h1 className="text-3xl font-bold gradient-text">{tc.title}</h1>
+                <p className="text-gray-500 text-sm mt-1">{tc.subtitle}</p>
               </div>
             </div>
 
@@ -66,11 +69,11 @@ export default function ClaimIndexPage() {
               <div className="group">
                 <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-3">
                   <Key className="w-4 h-4 text-yellow-500" />
-                  红包 ID
+                  {form.packetId}
                 </label>
                 <input
                   className="w-full px-4 py-4 border-2 border-gray-200 rounded-xl focus:border-yellow-400 focus:ring-4 focus:ring-yellow-100 outline-none transition-all text-lg group-hover:border-gray-300"
-                  placeholder={isEvm ? "0x..." : "例如：abc123..."}
+                  placeholder={isEvm ? "0x..." : common.packetIdPlaceholder}
                   value={packetId}
                   onChange={(e) => setPacketId(e.target.value)}
                   onKeyDown={(e) => {
@@ -84,7 +87,7 @@ export default function ClaimIndexPage() {
                 className="relative overflow-hidden w-full bg-gradient-to-r from-orange-600 via-yellow-600 to-orange-600 text-white font-bold text-lg py-5 rounded-2xl shadow-2xl hover:shadow-3xl transition-all flex items-center justify-center gap-3 transform hover:scale-105 active:scale-95"
               >
                 <span className="absolute inset-0 bg-shimmer pointer-events-none" />
-                前往领取
+                {tc.submit}
               </button>
             </div>
           </div>

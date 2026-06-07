@@ -6,6 +6,7 @@ import { WalletButton } from "../../components/WalletButton";
 import { ArrowLeft, Search, Copy, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { shortenId } from "../../lib/utils";
+import { useI18n } from "@/i18n";
 
 type MyPacket = {
   id: string;
@@ -40,6 +41,8 @@ const writeMyPackets = (list: MyPacket[]) => {
 };
 
 export default function PacketIndexPage() {
+  const { t } = useI18n();
+  const { packetIndex: tp, form, common, errors } = t;
   const router = useRouter();
   const [packetId, setPacketId] = useState("");
   const [myPackets, setMyPackets] = useState<MyPacket[]>([]);
@@ -64,13 +67,13 @@ export default function PacketIndexPage() {
   const copyClaimLink = async (id: string) => {
     const link = `${window.location.origin}/claim/${id}`;
     await navigator.clipboard.writeText(link);
-    toast.success("已复制分享链接");
+    toast.success(errors.copyShareSuccess);
   };
 
   const goDetail = () => {
     const id = packetId.trim();
     if (!id) {
-      toast.error("请输入红包 ID");
+      toast.error(errors.enterPacketId);
       return;
     }
     router.push(`/packet/${id}`);
@@ -93,7 +96,7 @@ export default function PacketIndexPage() {
             className="group flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-all"
           >
             <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-            <span className="font-medium">返回首页</span>
+            <span className="font-medium">{common.backHome}</span>
           </Link>
           <WalletButton />
         </div>
@@ -105,29 +108,29 @@ export default function PacketIndexPage() {
                 <Search className="w-7 h-7 text-white" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold gradient-text">我的红包</h1>
-                <p className="text-gray-500 text-sm mt-1">输入红包 ID 查看详情</p>
+                <h1 className="text-3xl font-bold gradient-text">{tp.title}</h1>
+                <p className="text-gray-500 text-sm mt-1">{tp.subtitle}</p>
               </div>
             </div>
 
             {myPackets.length > 0 && (
               <div className="mb-8 space-y-3">
                 <div className="flex items-center justify-between">
-                  <div className="text-sm font-semibold text-gray-700">我创建的红包</div>
+                  <div className="text-sm font-semibold text-gray-700">{common.myCreatedPackets}</div>
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={refreshMyPackets}
                       className="text-xs font-semibold text-gray-600 hover:text-gray-900"
                     >
-                      刷新
+                      {common.refresh}
                     </button>
                     <button
                       type="button"
                       onClick={clearAll}
                       className="text-xs font-semibold text-red-600 hover:text-red-700"
                     >
-                      清空
+                      {common.clear}
                     </button>
                   </div>
                 </div>
@@ -144,8 +147,8 @@ export default function PacketIndexPage() {
                           </div>
                           <div className="text-xs text-gray-500 mt-1">
                             {item.amountInj ? `${item.amountInj} INJ` : ""}
-                            {item.count ? ` · ${item.count} 个` : ""}
-                            {item.mode ? ` · ${item.mode === "random" ? "随机" : "均分"}` : ""}
+                            {item.count ? ` · ${item.count} ${common.unitCount}` : ""}
+                            {item.mode ? ` · ${item.mode === "random" ? form.random : form.equal}` : ""}
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
@@ -153,7 +156,7 @@ export default function PacketIndexPage() {
                             type="button"
                             onClick={() => copyClaimLink(item.id)}
                             className="p-2 rounded-xl hover:bg-gray-100"
-                            title="复制分享链接"
+                            title={common.copyShareLink}
                           >
                             <Copy className="w-4 h-4 text-gray-600" />
                           </button>
@@ -162,13 +165,13 @@ export default function PacketIndexPage() {
                             onClick={() => router.push(`/packet/${item.id}`)}
                             className="px-3 py-2 rounded-xl bg-yellow-600 text-white text-xs font-semibold hover:bg-yellow-700"
                           >
-                            查看
+                            {common.view}
                           </button>
                           <button
                             type="button"
                             onClick={() => removePacket(item.id)}
                             className="p-2 rounded-xl hover:bg-red-50"
-                            title="移除"
+                            title={common.remove}
                           >
                             <Trash2 className="w-4 h-4 text-red-600" />
                           </button>
@@ -181,15 +184,15 @@ export default function PacketIndexPage() {
             )}
 
             <div className="mt-10 rounded-2xl border border-gray-100 bg-white/95 p-5">
-              <div className="text-sm font-semibold text-gray-700">查询红包</div>
+              <div className="text-sm font-semibold text-gray-700">{tp.queryTitle}</div>
               <div className="mt-4 space-y-6">
                 <div className="group">
                   <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-3">
-                    红包 ID
+                    {form.packetId}
                   </label>
                   <input
                     className="w-full px-4 py-4 border-2 border-gray-200 rounded-xl focus:border-yellow-400 focus:ring-4 focus:ring-yellow-100 outline-none transition-all text-lg group-hover:border-gray-300"
-                    placeholder="例如：abc123..."
+                    placeholder={common.packetIdPlaceholder}
                     value={packetId}
                     onChange={(e) => setPacketId(e.target.value)}
                     onKeyDown={(e) => {
@@ -203,7 +206,7 @@ export default function PacketIndexPage() {
                   className="relative overflow-hidden w-full bg-gradient-to-r from-yellow-600 via-amber-500 to-orange-500 text-white font-bold text-lg py-5 rounded-2xl shadow-2xl hover:shadow-3xl transition-all flex items-center justify-center gap-3 transform hover:scale-105 active:scale-95"
                 >
                   <span className="absolute inset-0 bg-shimmer pointer-events-none" />
-                  查看红包详情
+                  {common.viewPacketDetail}
                 </button>
               </div>
             </div>

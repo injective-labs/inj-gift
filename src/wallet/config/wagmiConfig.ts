@@ -50,6 +50,9 @@ export const wagmiConfig = createConfig({
     [injectiveInEvmMainnet.id]: chainTransport(injectiveInEvmMainnet),
   },
   connectors: typeof window !== "undefined" ? [
+    // Generic injected connector — picks up any EIP-1193 provider on
+    // window.ethereum, including the INJ Pass embedded-wallet provider.
+    injected(),
     injected({
       target: "metaMask",
     }),

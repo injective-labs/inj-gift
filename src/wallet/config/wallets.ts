@@ -1,32 +1,41 @@
 import type { WalletDescriptor } from "../controller/walletController.types";
 import { isWalletConnectConfigured } from "./wagmiConfig";
 
+const isInjpassConfigured = !!process.env.NEXT_PUBLIC_INJPASS_EMBED_URL;
+
 export const EVM_WALLETS: WalletDescriptor[] = [
+  {
+    id: "injpass",
+    name: "INJ Pass",
+    hintKey: isInjpassConfigured ? "noInstall" : "notConfigured",
+    recommended: isInjpassConfigured,
+    enabled: isInjpassConfigured,
+  },
   {
     id: "metamask",
     name: "MetaMask",
-    hint: "推荐使用",
-    recommended: true,
+    hintKey: "recommendedUse",
+    recommended: false,
     enabled: true,
   },
   {
     id: "walletconnect",
     name: "WalletConnect",
-    hint: isWalletConnectConfigured() ? "手机扫码" : "未配置",
+    hintKey: isWalletConnectConfigured() ? "scanQr" : "notConfigured",
     recommended: false,
     enabled: isWalletConnectConfigured(),
   },
   {
     id: "okx",
     name: "OKX Wallet",
-    hint: "已安装",
+    hintKey: "installed",
     recommended: false,
     enabled: true,
   },
   {
     id: "coinbase",
     name: "Coinbase Wallet",
-    hint: "可选",
+    hintKey: "optional",
     recommended: false,
     enabled: true,
   },

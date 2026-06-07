@@ -1,6 +1,7 @@
 "use client";
 
 import clsx from "clsx";
+import { useI18n } from "@/i18n";
 
 export function WalletItem({
   title,
@@ -15,6 +16,7 @@ export function WalletItem({
   disabled?: boolean;
   onClick: () => void;
 }) {
+  const { t } = useI18n();
   return (
     <button
       type="button"
@@ -33,7 +35,7 @@ export function WalletItem({
           <div className="font-semibold text-gray-900 truncate">{title}</div>
           {recommended && (
             <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">
-              推荐
+              {t.common.recommended}
             </span>
           )}
         </div>
