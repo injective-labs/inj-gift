@@ -63,11 +63,13 @@ export async function connectInjpass(): Promise<{ provider: Eip1193Provider; add
     });
 
     const wallet = await connector.connect();
+    console.log('[inj-gift injpass] connected, address:', wallet.address);
     const p = connector.getEthereumProvider();
     provider = p;
 
     // Install as window.ethereum so EvmWallet + wagmi injected pick it up.
     (window as unknown as { ethereum?: unknown }).ethereum = p;
+    console.log('[inj-gift injpass] provider installed on window.ethereum, isInjPass:', p.isInjPass);
     window.dispatchEvent(new Event("ethereum#initialized"));
 
     return { provider: p, address: wallet.address };

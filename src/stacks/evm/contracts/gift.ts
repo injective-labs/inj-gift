@@ -83,8 +83,24 @@ export class InjGiftContractWrapper {
         overrides,
       )) as TxLike;
 
-      const receipt = tx.wait ? await tx.wait() : undefined;
-      const packetId = receipt ? this.extractPacketId(receipt) : undefined;
+      console.log('[inj-gift] createRedPacket tx returned:', {
+        hash: tx.hash,
+        hasWait: typeof tx.wait === 'function',
+        txKeys: Object.keys(tx),
+      });
+
+      // Wait for tx to be mined so we can extract packetId from receipt logs.
+      // UI stays in "创建中..." until the tx is confirmed on-chain.
+      let packetId: string | undefined;
+      let receipt: unknown;
+      if (tx.wait) {
+        receipt = await tx.wait();
+        console.log('[inj-gift] tx.wait() resolved, receipt:', receipt);
+        packetId = this.extractPacketId(receipt as { logs?: Array<unknown> });
+        console.log('[inj-gift] extracted packetId:', packetId);
+      } else {
+        console.warn('[inj-gift] tx.wait is NOT available — cannot get receipt/packetId');
+      }
       return { hash: tx.hash, receipt, packetId };
     } catch (e: unknown) {
       if (isUserRejected(e)) throw appError("USER_REJECTED", "User rejected transaction");

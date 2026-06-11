@@ -24,8 +24,13 @@ export class EvmWallet {
     if (!this.provider) {
       throw appError("RPC_ERROR", "MetaMask or compatible wallet not found");
     }
+    console.log('[inj-gift EvmWallet] connecting, window.ethereum:', {
+      isINJPass: !!(window.ethereum as any)?.isInjPass,
+      isMetaMask: !!(window.ethereum as any)?.isMetaMask,
+    });
     try {
       const accounts = (await this.provider.send("eth_requestAccounts", [])) as string[];
+      console.log('[inj-gift EvmWallet] accounts:', accounts);
       if (!accounts || accounts.length === 0) {
         throw appError("USER_REJECTED", "No accounts returned");
       }
