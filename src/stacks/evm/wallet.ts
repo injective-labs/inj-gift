@@ -20,21 +20,30 @@ export class EvmWallet {
     }
   }
 
-  async connect(): Promise<void> {
-    if (!this.provider) {
+  private ensureProvider(): BrowserProvider {
+    if (typeof window === "undefined" || !window.ethereum) {
       throw appError("RPC_ERROR", "MetaMask or compatible wallet not found");
     }
+    // Re-check: wallet (e.g. INJ Pass) may have set window.ethereum after construction
+    if (!this.provider) {
+      this.provider = new ethers.BrowserProvider(window.ethereum);
+    }
+    return this.provider;
+  }
+
+  async connect(): Promise<void> {
+    const provider = this.ensureProvider();
     console.log('[inj-gift EvmWallet] connecting, window.ethereum:', {
       isINJPass: !!(window.ethereum as any)?.isInjPass,
       isMetaMask: !!(window.ethereum as any)?.isMetaMask,
     });
     try {
-      const accounts = (await this.provider.send("eth_requestAccounts", [])) as string[];
+      const accounts = (await provider.send("eth_requestAccounts", [])) as string[];
       console.log('[inj-gift EvmWallet] accounts:', accounts);
       if (!accounts || accounts.length === 0) {
         throw appError("USER_REJECTED", "No accounts returned");
       }
-      this.signer = await this.provider.getSigner();
+      this.signer = await provider.getSigner();
       this.address = await this.signer.getAddress();
       await this.ensureCorrectNetwork();
     } catch (e: unknown) {
