@@ -45,11 +45,11 @@ export const INJECTIVE_EVM_NETWORKS = {
     blockExplorerUrls: ["https://testnet.blockscout.injective.network/"],
   },
   mainnet: {
-    chainId: 2525,
+    chainId: 1776,
     chainName: "Injective inEVM Mainnet",
     nativeCurrency: { name: "INJ", symbol: "INJ", decimals: 18 },
-    rpcUrls: ["https://mainnet.inevm.com"],
-    blockExplorerUrls: ["https://inevm.explorer.post.21.works"],
+    rpcUrls: ["https://sentry.evm-rpc.injective.network/"],
+    blockExplorerUrls: ["https://blockscout.injective.network"],
   },
 };
 
