@@ -100,7 +100,12 @@ export function WalletModal({
                 hint={w.hintKey ? hints[w.hintKey] : undefined}
                 recommended={w.recommended}
                 disabled={isBusy || w.enabled === false}
-                onClick={() => actions.connect(w.id)}
+                onClick={() => {
+                  // connect() rethrows on failure; it already records the error
+                  // into UI state, so swallow the rejection here to avoid an
+                  // "Uncaught (in promise)" in the console.
+                  void actions.connect(w.id).catch(() => {});
+                }}
               />
             ))}
           </div>

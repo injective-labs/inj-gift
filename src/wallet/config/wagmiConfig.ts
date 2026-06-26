@@ -1,19 +1,16 @@
 "use client";
 
 import { createConfig, http } from "wagmi";
-import { injected, walletConnect, coinbaseWallet } from "wagmi/connectors";
+import { injected } from "wagmi/connectors";
 import { injectiveInEvmMainnet, injectiveInEvmTestnet } from "./evmChains";
 import { evmEnv } from "@/stacks/evm/config";
 
-const wcProjectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
-
-const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-const appIconUrl = process.env.NEXT_PUBLIC_APP_ICON_URL || `${appUrl}/favicon.ico`;
-
-// EVM-first Phase 1:
-// - We default to EVM-only connectors.
-// - Future multi-backend support (e.g. CosmWasm) should plug in via a separate controller
-//   without changing UI components.
+// EVM-first, INJ Pass only:
+// - INJ Pass installs its EIP-1193 provider on window.ethereum; the generic
+//   `injected()` connector then transacts through it.
+// - All other wallet connectors (MetaMask / OKX / WalletConnect / Coinbase)
+//   were removed on purpose — coexisting injected wallets contend over
+//   window.ethereum / EIP-6963 and broke connection on some machines.
 
 export const evmChains = [injectiveInEvmTestnet, injectiveInEvmMainnet] as const;
 
@@ -28,63 +25,18 @@ function chainTransport(chain: Chain) {
   return http(chain.rpcUrls.default.http[0]);
 }
 
-const getOkxProvider = (window?: Window) => {
-  if (typeof window === "undefined") return undefined;
-  const anyWindow = window as unknown as Record<string, unknown>;
-  const okxWallet = anyWindow.okxwallet ?? anyWindow.okxWallet;
-  if (okxWallet) return okxWallet as unknown;
-
-  const ethereum = anyWindow.ethereum as { providers?: Array<Record<string, unknown>>; isOkxWallet?: boolean } | undefined;
-  if (ethereum?.providers?.length) {
-    return ethereum.providers.find((p) => p.isOkxWallet) as unknown;
-  }
-  if (ethereum?.isOkxWallet) return ethereum as unknown;
-
-  return undefined;
-};
-
 export const wagmiConfig = createConfig({
   chains: evmChains,
   transports: {
     [injectiveInEvmTestnet.id]: chainTransport(injectiveInEvmTestnet),
     [injectiveInEvmMainnet.id]: chainTransport(injectiveInEvmMainnet),
   },
-  connectors: typeof window !== "undefined" ? [
-    // Generic injected connector — picks up any EIP-1193 provider on
-    // window.ethereum, including the INJ Pass embedded-wallet provider.
-    injected(),
-    injected({
-      target: "metaMask",
-    }),
-    injected({
-      target: {
-        id: "okxWallet",
-        name: "OKX Wallet",
-        // Type assertion needed due to Window type conflict between wagmi and DOM types
-        provider: getOkxProvider as any,
-      },
-    }),
-    ...(wcProjectId
-      ? [
-          walletConnect({
-            projectId: wcProjectId,
-            showQrModal: true,
-            metadata: {
-              name: "InjGift",
-              description: "Injective inEVM Red Packet",
-              url: appUrl,
-              icons: [appIconUrl],
-            },
-          }),
-        ]
-      : []),
-    // Optional (can be enabled later in UI config)
-    coinbaseWallet({
-      appName: "InjGift",
-    }),
-  ] : [],
+  connectors: typeof window !== "undefined"
+    ? [
+        // Generic injected connector — picks up the INJ Pass embedded-wallet
+        // provider that connectInjpass() installs on window.ethereum.
+        injected(),
+      ]
+    : [],
   ssr: true,
 });
-
-export const isWalletConnectConfigured = () => !!wcProjectId;
-

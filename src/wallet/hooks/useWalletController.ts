@@ -5,27 +5,12 @@ import { useAccount, useConnect, useDisconnect, useSwitchChain, useChainId } fro
 import { normalizeError } from "@/domain/normalizeError";
 import { appError } from "@/domain/errors";
 import { getEvmConfigOrThrow } from "@/stacks/evm/config";
-import { connectInjpass } from "@/wallet/injpass/provider";
+import { connectInjpass, isInjpassConnected } from "@/wallet/injpass/provider";
 import type { WalletController, WalletControllerState } from "../controller/walletController.types";
 
-const walletIdToConnectorId = (id: string) => {
-  switch (id) {
-    case "metamask":
-      return "metaMask";
-    case "okx":
-      return "okxWallet";
-    case "walletconnect":
-      return "walletConnect";
-    case "coinbase":
-      return "coinbaseWallet";
-    case "injpass":
-      // INJ Pass installs its EIP-1193 provider on window.ethereum, which the
-      // generic injected connector then picks up.
-      return "injected";
-    default:
-      return id;
-  }
-};
+// INJ Pass is the only wallet. It installs its EIP-1193 provider on
+// window.ethereum, which the generic `injected` connector then picks up.
+const walletIdToConnectorId = (id: string) => (id === "injpass" ? "injected" : id);
 
 export function useWalletController(): WalletController {
   const [isModalOpen, setModalOpen] = useState(false);
@@ -105,7 +90,11 @@ export function useWalletController(): WalletController {
         setUiError(null);
         setUiStatus("connecting");
 
-        if (accountStatus === "connected" && address) {
+        // Only short-circuit if INJ Pass itself is already the live connection.
+        // A stray injected/extension session that wagmi auto-reconnected to must
+        // NOT be treated as "connected" — otherwise clicking INJ Pass would skip
+        // connectInjpass() and silently leave the user on the wrong wallet.
+        if (isInjpassConnected() && accountStatus === "connected" && address) {
           await switchNetwork(true);
           setUiStatus("connected");
           setModalOpen(false);
@@ -114,8 +103,16 @@ export function useWalletController(): WalletController {
 
         // INJ Pass: spin up the embedded wallet (iframe + passkey popup) and
         // install its provider on window.ethereum before the injected connector
-        // reads it.
+        // reads it. If wagmi auto-reconnected to an extension, drop it first so
+        // the injected connector re-reads the freshly installed INJ Pass provider.
         if (walletId === "injpass") {
+          if (accountStatus === "connected") {
+            try {
+              await disconnectAsync();
+            } catch {
+              // ignore — best effort before re-connecting through INJ Pass
+            }
+          }
           await connectInjpass();
         }
 
@@ -151,7 +148,7 @@ export function useWalletController(): WalletController {
         throw err;
       }
     },
-    [accountStatus, address, connectAsync, connectors, expectedChainId, chainId, switchNetwork, isAlreadyConnectedError],
+    [accountStatus, address, connectAsync, disconnectAsync, connectors, expectedChainId, chainId, switchNetwork, isAlreadyConnectedError],
   );
 
   const disconnect = useCallback(async () => {

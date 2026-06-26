@@ -1,8 +1,12 @@
 import type { WalletDescriptor } from "../controller/walletController.types";
-import { isWalletConnectConfigured } from "./wagmiConfig";
 
 const isInjpassConfigured = !!process.env.NEXT_PUBLIC_INJPASS_EMBED_URL;
 
+// INJ Pass is the ONLY supported wallet. Other EVM wallets (MetaMask, OKX,
+// WalletConnect, Coinbase) were intentionally removed: the app embeds the INJ
+// Pass passkey wallet and installs its EIP-1193 provider on window.ethereum.
+// Coexisting injected wallets fight over window.ethereum / EIP-6963 and caused
+// "connects on some machines, not others" failures.
 export const EVM_WALLETS: WalletDescriptor[] = [
   {
     id: "injpass",
@@ -11,33 +15,4 @@ export const EVM_WALLETS: WalletDescriptor[] = [
     recommended: isInjpassConfigured,
     enabled: isInjpassConfigured,
   },
-  {
-    id: "metamask",
-    name: "MetaMask",
-    hintKey: "recommendedUse",
-    recommended: false,
-    enabled: true,
-  },
-  {
-    id: "walletconnect",
-    name: "WalletConnect",
-    hintKey: isWalletConnectConfigured() ? "scanQr" : "notConfigured",
-    recommended: false,
-    enabled: isWalletConnectConfigured(),
-  },
-  {
-    id: "okx",
-    name: "OKX Wallet",
-    hintKey: "installed",
-    recommended: false,
-    enabled: true,
-  },
-  {
-    id: "coinbase",
-    name: "Coinbase Wallet",
-    hintKey: "optional",
-    recommended: false,
-    enabled: true,
-  },
 ];
-
