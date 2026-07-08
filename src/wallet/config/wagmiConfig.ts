@@ -2,12 +2,16 @@
 
 import { createConfig, http } from "wagmi";
 import { injected } from "wagmi/connectors";
+import type { EIP1193Provider } from "viem";
 import { injectiveInEvmMainnet, injectiveInEvmTestnet } from "./evmChains";
 import { evmEnv } from "@/stacks/evm/config";
+import { getInjpassEip1193 } from "@/wallet/injpass/provider";
 
 // EVM-first, INJ Pass only:
-// - INJ Pass installs its EIP-1193 provider on window.ethereum; the generic
-//   `injected()` connector then transacts through it.
+// - The `injected()` connector targets the INJ Pass EIP-1193 provider DIRECTLY
+//   (via getInjpassEip1193()), NOT window.ethereum. Reading window.ethereum is
+//   unreliable: a wallet extension (MetaMask/OKX) that owns it read-only would
+//   shadow INJ Pass and the connect would hang forever on some machines.
 // - All other wallet connectors (MetaMask / OKX / WalletConnect / Coinbase)
 //   were removed on purpose — coexisting injected wallets contend over
 //   window.ethereum / EIP-6963 and broke connection on some machines.
@@ -33,9 +37,23 @@ export const wagmiConfig = createConfig({
   },
   connectors: typeof window !== "undefined"
     ? [
-        // Generic injected connector — picks up the INJ Pass embedded-wallet
-        // provider that connectInjpass() installs on window.ethereum.
-        injected(),
+        // Injected connector bound to the INJ Pass provider explicitly. `target`
+        // and `target.provider` are evaluated lazily at connect-time, so by the
+        // time the user clicks connect, connectInjpass() has already populated
+        // getInjpassEip1193(). Returning undefined before that is fine — the
+        // connector simply reports "not ready" instead of grabbing an extension.
+        injected({
+          // Stable target so the connector id is always "injpass". The provider
+          // itself is resolved lazily on each getProvider() call: undefined until
+          // connectInjpass() populates it, then the live INJ Pass EIP-1193
+          // provider. Never touches window.ethereum, so extensions can't shadow it.
+          target: () => ({
+            id: "injpass",
+            name: "INJ Pass",
+            provider: () =>
+              getInjpassEip1193() as unknown as EIP1193Provider | undefined,
+          }),
+        }),
       ]
     : [],
   ssr: true,

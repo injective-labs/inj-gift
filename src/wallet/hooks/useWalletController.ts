@@ -8,9 +8,10 @@ import { getEvmConfigOrThrow } from "@/stacks/evm/config";
 import { connectInjpass, isInjpassConnected } from "@/wallet/injpass/provider";
 import type { WalletController, WalletControllerState } from "../controller/walletController.types";
 
-// INJ Pass is the only wallet. It installs its EIP-1193 provider on
-// window.ethereum, which the generic `injected` connector then picks up.
-const walletIdToConnectorId = (id: string) => (id === "injpass" ? "injected" : id);
+// INJ Pass is the only wallet. Its `injected()` connector targets the INJ Pass
+// EIP-1193 provider directly (see wagmiConfig.ts), so once connectInjpass() has
+// populated the provider the connector's dynamic id is "injpass".
+const walletIdToConnectorId = (id: string) => id;
 
 export function useWalletController(): WalletController {
   const [isModalOpen, setModalOpen] = useState(false);
