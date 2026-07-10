@@ -4,6 +4,7 @@ import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { WalletButton } from "../../../components/WalletButton";
 import { useGiftAdapter } from "../../../hooks/useGiftAdapter";
+import { getInjpassEip1193 } from "@/wallet/injpass/provider";
 import { isBytes32Hex } from "../../../lib/utils";
 import type { GiftPacket } from "../../../domain/types";
 import { ethers } from "ethers";
@@ -88,9 +89,14 @@ export default function PacketDetailPage() {
         return;
       }
 
-      if (typeof window !== "undefined" && (window as any).ethereum) {
+      // Prefer the INJ Pass provider over the raw window.ethereum global so we
+      // display the INJ Pass account, not a MetaMask/OKX extension's account.
+      const eip1193 =
+        getInjpassEip1193() ??
+        (typeof window !== "undefined" ? window.ethereum : undefined);
+      if (eip1193) {
         try {
-          const provider = new ethers.BrowserProvider((window as any).ethereum);
+          const provider = new ethers.BrowserProvider(eip1193);
           const accounts = (await provider.send("eth_accounts", [])) as string[];
           if (!mounted) return;
           setAddress(accounts?.[0] ?? null);
