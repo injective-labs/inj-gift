@@ -69,6 +69,9 @@ export class InjGiftContractWrapper {
   }): Promise<TxLike & { packetId?: string; receipt?: unknown }> {
     try {
       const modeEnum = params.mode === "random" ? 0 : 1;
+      if (params.token === ethers.ZeroAddress) {
+        await this.assertNativeBalance(BigInt(params.amount));
+      }
       const overrides = params.token === ethers.ZeroAddress
         ? { value: BigInt(params.amount) }
         : {};
@@ -104,12 +107,40 @@ export class InjGiftContractWrapper {
       return { hash: tx.hash, receipt, packetId };
     } catch (e: unknown) {
       if (isUserRejected(e)) throw appError("USER_REJECTED", "User rejected transaction");
-      if (isInsufficientFunds(e)) throw appError("INSUFFICIENT_FUNDS", "Insufficient funds for gas + value");
+      if (isInsufficientFunds(e)) {
+        throw appError("INSUFFICIENT_FUNDS", "Insufficient funds for gas + value", {
+          cause: e,
+          messageKey: "insufficientFunds",
+        });
+      }
       if (isRevert(e)) {
         const reason = extractRevertReason(e);
         throw appError("REVERT", reason || "Contract reverted", { cause: e });
       }
       throw appError("RPC_ERROR", "Failed to create packet", { cause: e });
+    }
+  }
+
+  private async assertNativeBalance(packetAmount: bigint): Promise<void> {
+    const signer = this.signerOrProvider as Signer;
+    const provider = signer.provider
+      || (this.signerOrProvider instanceof BrowserProvider ? this.signerOrProvider : null);
+    if (!provider || typeof signer.getAddress !== "function") return;
+
+    const sender = await signer.getAddress();
+    const balance = await provider.getBalance(sender);
+    if (balance <= packetAmount) {
+      throw appError(
+        "INSUFFICIENT_FUNDS",
+        "Insufficient INJ balance for the packet amount and gas",
+        {
+          messageKey: "insufficientFunds",
+          data: {
+            balance: balance.toString(),
+            packetAmount: packetAmount.toString(),
+          },
+        },
+      );
     }
   }
 
@@ -138,7 +169,12 @@ export class InjGiftContractWrapper {
       return { hash: tx.hash, receipt, claimAmount };
     } catch (e: unknown) {
       if (isUserRejected(e)) throw appError("USER_REJECTED", "User rejected transaction");
-      if (isInsufficientFunds(e)) throw appError("INSUFFICIENT_FUNDS", "Insufficient funds for gas");
+      if (isInsufficientFunds(e)) {
+        throw appError("INSUFFICIENT_FUNDS", "Insufficient funds for gas", {
+          cause: e,
+          messageKey: "insufficientFunds",
+        });
+      }
       if (isRevert(e)) {
         const reason = extractRevertReason(e);
         throw appError("REVERT", reason || "Contract reverted", { cause: e });
@@ -172,7 +208,12 @@ export class InjGiftContractWrapper {
       return { hash: tx.hash, receipt };
     } catch (e: unknown) {
       if (isUserRejected(e)) throw appError("USER_REJECTED", "User rejected transaction");
-      if (isInsufficientFunds(e)) throw appError("INSUFFICIENT_FUNDS", "Insufficient funds for gas");
+      if (isInsufficientFunds(e)) {
+        throw appError("INSUFFICIENT_FUNDS", "Insufficient funds for gas", {
+          cause: e,
+          messageKey: "insufficientFunds",
+        });
+      }
       if (isRevert(e)) {
         const reason = extractRevertReason(e);
         throw appError("REVERT", reason || "Contract reverted", { cause: e });
@@ -196,9 +237,12 @@ function isUserRejected(e: unknown): boolean {
 function isInsufficientFunds(e: unknown): boolean {
   if (e && typeof e === "object") {
     const anyE = e as Record<string, unknown>;
+    const details = collectErrorText(e).toLowerCase();
     return (
-      anyE.code === -32603 ||
-      (typeof anyE.message === "string" && anyE.message.toLowerCase().includes("insufficient funds"))
+      anyE.code === "INSUFFICIENT_FUNDS" ||
+      details.includes("insufficient funds") ||
+      details.includes("insufficient balance") ||
+      details.includes("funds for gas")
     );
   }
   return false;
@@ -209,7 +253,7 @@ function isRevert(e: unknown): boolean {
     const anyE = e as Record<string, unknown>;
     return (
       anyE.code === -32000 ||
-      (typeof anyE.message === "string" && anyE.message.toLowerCase().includes("revert"))
+      collectErrorText(e).toLowerCase().includes("revert")
     );
   }
   return false;
@@ -218,7 +262,26 @@ function isRevert(e: unknown): boolean {
 function extractRevertReason(e: unknown): string | undefined {
   if (e && typeof e === "object") {
     const anyE = e as Record<string, unknown>;
+    if (typeof anyE.reason === "string") return anyE.reason;
+    if (typeof anyE.shortMessage === "string") return anyE.shortMessage;
     if (typeof anyE.message === "string") return anyE.message;
   }
   return undefined;
+}
+
+function collectErrorText(value: unknown, depth = 0, seen = new Set<unknown>()): string {
+  if (depth > 4 || value === null || value === undefined || seen.has(value)) return "";
+  if (typeof value === "string") return value;
+  if (typeof value !== "object") return "";
+  seen.add(value);
+  const record = value as Record<string, unknown>;
+  return [
+    record.message,
+    record.shortMessage,
+    record.reason,
+    record.error,
+    record.info,
+    record.cause,
+    record.data,
+  ].map((item) => collectErrorText(item, depth + 1, seen)).filter(Boolean).join(" ");
 }

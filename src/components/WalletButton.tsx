@@ -3,10 +3,15 @@
 import clsx from "clsx";
 import { ChevronDown, LogOut, Copy, CheckCircle, Loader2 } from "lucide-react";
 import Image from "next/image";
-import { useMemo, useState } from "react";
-import { WalletModal } from "@/wallet/ui/WalletModal";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useWalletController } from "@/wallet/hooks/useWalletController";
-import { useI18n } from "@/i18n";
+import { errorMessage, useI18n } from "@/i18n";
+import { toast } from "sonner";
+import {
+  isInjpassMiniAppHost,
+  requestInjpassHostLogin,
+  subscribeToInjpassHostSession,
+} from "@/wallet/injpass/hostProvider";
 
 interface WalletButtonProps {
   className?: string;
@@ -20,6 +25,7 @@ export const WalletButton = ({ className, label }: WalletButtonProps) => {
   const { state, actions } = useWalletController();
   const [showDropdown, setShowDropdown] = useState(false);
   const [copied, setCopied] = useState(false);
+  const hostConnectingRef = useRef(false);
 
   const shortAddress = useMemo(() => {
     if (!state.address) return "";
@@ -28,6 +34,19 @@ export const WalletButton = ({ className, label }: WalletButtonProps) => {
 
   const isConnected = !!state.address;
   const isBusy = state.status === "connecting" || state.status === "switching_network";
+
+  useEffect(() => {
+    if (!isInjpassMiniAppHost()) return;
+    return subscribeToInjpassHostSession((session) => {
+      if (!session.authenticated || !session.address || state.address || hostConnectingRef.current) return;
+      hostConnectingRef.current = true;
+      void actions.connect("injpass")
+        .catch((error) => toast.error(errorMessage(error, t)))
+        .finally(() => {
+          hostConnectingRef.current = false;
+        });
+    });
+  }, [actions, state.address, t]);
 
   const copyAddress = () => {
     if (state.address) {
@@ -39,8 +58,6 @@ export const WalletButton = ({ className, label }: WalletButtonProps) => {
 
   return (
     <>
-      <WalletModal state={state} actions={actions} />
-
       {isConnected ? (
         <div className="relative">
           <button
@@ -60,7 +77,10 @@ export const WalletButton = ({ className, label }: WalletButtonProps) => {
                 className="h-4 w-auto"
               />
             </div>
-            <span className="max-w-[120px] truncate font-mono text-sm">{shortAddress}</span>
+            <span className="min-w-0 max-w-[150px]">
+              <span className="block truncate text-xs font-bold">{state.walletName || "INJ Pass Wallet"}</span>
+              <span className="mt-0.5 block truncate font-mono text-[11px] font-medium text-amber-950/60">{shortAddress}</span>
+            </span>
             <ChevronDown
               className={clsx(
                 "w-4 h-4 transition-transform",
@@ -116,7 +136,17 @@ export const WalletButton = ({ className, label }: WalletButtonProps) => {
         </div>
       ) : (
         <button
-          onClick={() => actions.openModal()}
+          onClick={() => {
+            if (isInjpassMiniAppHost()) {
+              void requestInjpassHostLogin().catch((error) => {
+                toast.error(errorMessage(error, t));
+              });
+              return;
+            }
+            void actions.connect("injpass").catch((error) => {
+              toast.error(errorMessage(error, t));
+            });
+          }}
           disabled={isBusy}
           className={clsx(
             "group relative flex items-center gap-2.5 overflow-hidden rounded-lg bg-[linear-gradient(135deg,#3f1fff_0%,#8a16e8_38%,#e91987_72%,#ff6b58_100%)] px-4 py-2 font-bold text-white shadow-xl shadow-fuchsia-900/20 transition-all hover:-translate-y-0.5 hover:shadow-2xl hover:shadow-fuchsia-900/25 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60",

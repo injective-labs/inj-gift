@@ -2,6 +2,10 @@
 
 import { InjPassConnector, type Eip1193Provider } from "@injpass/cli";
 import { getEvmConfigOrThrow } from "@/stacks/evm/config";
+import {
+  getInjpassHostProvider,
+  isInjpassMiniAppHost,
+} from "@/wallet/injpass/hostProvider";
 
 /**
  * INJ Pass embedded-wallet integration.
@@ -18,7 +22,12 @@ import { getEvmConfigOrThrow } from "@/stacks/evm/config";
 
 let connector: InjPassConnector | null = null;
 let provider: Eip1193Provider | null = null;
-let connectPromise: Promise<{ provider: Eip1193Provider; address: string }> | null = null;
+let connectedWalletMeta: { address: string; walletName?: string } | null = null;
+let connectPromise: Promise<{
+  provider: Eip1193Provider;
+  address: string;
+  walletName?: string;
+}> | null = null;
 
 /**
  * The live INJ Pass EIP-1193 provider, or undefined before `connectInjpass()`
@@ -31,7 +40,7 @@ let connectPromise: Promise<{ provider: Eip1193Provider; address: string }> | nu
  * the connect forever.
  */
 export function getInjpassEip1193(): Eip1193Provider | undefined {
-  return provider ?? undefined;
+  return provider ?? getInjpassHostProvider() ?? undefined;
 }
 
 function getEmbedUrl(): string {
@@ -88,13 +97,42 @@ function installOnWindow(p: Eip1193Provider): void {
  * Connect to the INJ Pass embedded wallet and install its provider on
  * `window.ethereum`. Idempotent: concurrent/repeat calls share one connection.
  */
-export async function connectInjpass(): Promise<{ provider: Eip1193Provider; address: string }> {
+export async function connectInjpass(): Promise<{
+  provider: Eip1193Provider;
+  address: string;
+  walletName?: string;
+}> {
   if (provider) {
-    return { provider, address: await readAddress(provider) };
+    return {
+      provider,
+      address: connectedWalletMeta?.address || await readAddress(provider),
+      walletName: connectedWalletMeta?.walletName,
+    };
   }
   if (connectPromise) return connectPromise;
 
   connectPromise = (async () => {
+    if (isInjpassMiniAppHost()) {
+      const hostedProvider = getInjpassHostProvider();
+      if (!hostedProvider) throw new Error("INJ Pass host bridge is unavailable.");
+      const session = await hostedProvider.waitForSession();
+      if (!session.authenticated || !session.address) {
+        await hostedProvider.request({ method: "injpass_requestLogin" });
+        throw new Error("Log in to INJ Pass to use this mini app.");
+      }
+      provider = hostedProvider;
+      connectedWalletMeta = {
+        address: session.address,
+        walletName: session.walletName,
+      };
+      installOnWindow(hostedProvider);
+      return {
+        provider: hostedProvider,
+        address: session.address,
+        walletName: session.walletName,
+      };
+    }
+
     const cfg = getEvmConfigOrThrow();
 
     connector = new InjPassConnector({
@@ -108,6 +146,7 @@ export async function connectInjpass(): Promise<{ provider: Eip1193Provider; add
     connector.onDisconnect(() => {
       provider = null;
       connector = null;
+      connectedWalletMeta = null;
       connectPromise = null;
     });
 
@@ -115,6 +154,10 @@ export async function connectInjpass(): Promise<{ provider: Eip1193Provider; add
     console.log('[inj-gift injpass] connected, address:', wallet.address);
     const p = connector.getEthereumProvider();
     provider = p;
+    connectedWalletMeta = {
+      address: wallet.address,
+      walletName: wallet.walletName,
+    };
 
     // Best-effort: also expose on window.ethereum for any code that reads it
     // directly (ethers `BrowserProvider`, EIP-6963-unaware libs). This is NOT
@@ -124,7 +167,11 @@ export async function connectInjpass(): Promise<{ provider: Eip1193Provider; add
     // must never block the connect flow.
     installOnWindow(p);
 
-    return { provider: p, address: wallet.address };
+    return {
+      provider: p,
+      address: wallet.address,
+      walletName: wallet.walletName,
+    };
   })();
 
   try {
@@ -133,6 +180,7 @@ export async function connectInjpass(): Promise<{ provider: Eip1193Provider; add
     connectPromise = null;
     connector = null;
     provider = null;
+    connectedWalletMeta = null;
     throw e;
   }
 }
@@ -142,8 +190,12 @@ export function isInjpassConnected(): boolean {
 }
 
 export function disconnectInjpass(): void {
+  if (isInjpassMiniAppHost()) {
+    void getInjpassHostProvider()?.request({ method: "injpass_requestLogout" }).catch(() => undefined);
+  }
   connector?.disconnect();
   provider = null;
   connector = null;
+  connectedWalletMeta = null;
   connectPromise = null;
 }

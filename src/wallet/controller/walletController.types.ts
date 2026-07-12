@@ -32,6 +32,7 @@ export type WalletControllerState = {
   isModalOpen: boolean;
   selectedWalletId: string | null;
   address: string | null;
+  walletName: string | null;
   chainId: number | null;
   expectedChainId: number | null;
   expectedChainName: string | null;
@@ -52,4 +53,3 @@ export type WalletController = {
   state: WalletControllerState;
   actions: WalletControllerActions;
 };
-

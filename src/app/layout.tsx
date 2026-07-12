@@ -1,7 +1,6 @@
 import "@/globals.css";
 import { ReactNode } from "react";
 import { TxToast } from "../components/TxToast";
-import { WalletProvider } from "../providers/WalletProvider";
 import { EvmProvider } from "../providers/EvmProvider";
 import { I18nProvider } from "@/i18n";
 import localFont from "next/font/local";
@@ -51,6 +50,13 @@ export const metadata = {
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
+  const app = (
+    <>
+      {children}
+      <TxToast />
+    </>
+  );
+
   return (
     <html lang="zh-CN">
       <body
@@ -58,10 +64,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       >
         <I18nProvider>
           <EvmProvider>
-            <WalletProvider>
-              {children}
-              <TxToast />
-            </WalletProvider>
+            {app}
           </EvmProvider>
         </I18nProvider>
       </body>

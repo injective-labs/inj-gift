@@ -5,7 +5,7 @@ import { useAccount, useConnect, useDisconnect, useSwitchChain, useChainId } fro
 import { normalizeError } from "@/domain/normalizeError";
 import { appError } from "@/domain/errors";
 import { getEvmConfigOrThrow } from "@/stacks/evm/config";
-import { connectInjpass, isInjpassConnected } from "@/wallet/injpass/provider";
+import { connectInjpass, disconnectInjpass, isInjpassConnected } from "@/wallet/injpass/provider";
 import type { WalletController, WalletControllerState } from "../controller/walletController.types";
 
 // INJ Pass is the only wallet. Its `injected()` connector targets the INJ Pass
@@ -16,13 +16,14 @@ const walletIdToConnectorId = (id: string) => id;
 export function useWalletController(): WalletController {
   const [isModalOpen, setModalOpen] = useState(false);
   const [selectedWalletId, setSelectedWalletId] = useState<string | null>(null);
+  const [connectedWalletName, setConnectedWalletName] = useState<string | null>(null);
   const [uiStatus, setUiStatus] = useState<WalletControllerState["status"]>("idle");
   const [uiError, setUiError] = useState<WalletControllerState["error"]>(null);
 
   const evmCfg = useMemo(() => {
     try {
       return getEvmConfigOrThrow();
-    } catch (e) {
+    } catch {
       return null;
     }
   }, []);
@@ -96,6 +97,8 @@ export function useWalletController(): WalletController {
         // NOT be treated as "connected" — otherwise clicking INJ Pass would skip
         // connectInjpass() and silently leave the user on the wrong wallet.
         if (isInjpassConnected() && accountStatus === "connected" && address) {
+          const existingWallet = await connectInjpass();
+          setConnectedWalletName(existingWallet.walletName || "INJ Pass Wallet");
           await switchNetwork(true);
           setUiStatus("connected");
           setModalOpen(false);
@@ -114,7 +117,8 @@ export function useWalletController(): WalletController {
               // ignore — best effort before re-connecting through INJ Pass
             }
           }
-          await connectInjpass();
+          const connectedWallet = await connectInjpass();
+          setConnectedWalletName(connectedWallet.walletName || "INJ Pass Wallet");
         }
 
         const connectorId = walletIdToConnectorId(walletId);
@@ -149,14 +153,16 @@ export function useWalletController(): WalletController {
         throw err;
       }
     },
-    [accountStatus, address, connectAsync, disconnectAsync, connectors, expectedChainId, chainId, switchNetwork, isAlreadyConnectedError],
+    [accountStatus, address, connectAsync, disconnectAsync, connectors, expectedChainId, switchNetwork, isAlreadyConnectedError],
   );
 
   const disconnect = useCallback(async () => {
     try {
       await disconnectAsync();
+      disconnectInjpass();
       setUiStatus("idle");
       setSelectedWalletId(null);
+      setConnectedWalletName(null);
       setUiError(null);
     } catch (e) {
       const err = normalizeError(e);
@@ -172,6 +178,7 @@ export function useWalletController(): WalletController {
     isModalOpen,
     selectedWalletId,
     address: address ?? null,
+    walletName: connectedWalletName,
     chainId: chainId ?? null,
     expectedChainId,
     expectedChainName,
@@ -190,4 +197,3 @@ export function useWalletController(): WalletController {
 
   return { state, actions };
 }
-
