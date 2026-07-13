@@ -8,7 +8,7 @@ const nextConfig: NextConfig = {
         headers: [
           {
             key: "Content-Security-Policy",
-            value: "frame-ancestors 'self' https://injpass.com https://www.injpass.com https://*.injpass.com http://localhost:3000",
+            value: "frame-ancestors 'self' https://injpass.com https://www.injpass.com https://*.injpass.com http://localhost:3000 https://inj-pass-frontend-test.vercel.app",
           },
         ],
       },
