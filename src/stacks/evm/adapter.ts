@@ -8,12 +8,15 @@ import type {
 } from "@/domain/types";
 import { EvmWallet } from "./wallet";
 import { InjGiftContractWrapper } from "./contracts/gift";
+import { JsonRpcProvider } from "ethers";
+import { getEvmConfigOrThrow } from "./config";
 
 export class EvmGiftAdapter implements GiftAdapter {
   readonly stack = "evm" as const;
 
   private wallet = new EvmWallet();
   private contract: InjGiftContractWrapper | null = null;
+  private readContract: InjGiftContractWrapper | null = null;
 
   async connect(): Promise<void> {
     await this.wallet.connect();
@@ -39,8 +42,13 @@ export class EvmGiftAdapter implements GiftAdapter {
   }
 
   async getPacket(id: string): Promise<GiftPacket> {
-    await this.ensureConnected();
-    return this.contract!.getPacket(id);
+    if (this.contract) return this.contract.getPacket(id);
+    if (!this.readContract) {
+      this.readContract = new InjGiftContractWrapper(
+        new JsonRpcProvider(getEvmConfigOrThrow().rpcUrl),
+      );
+    }
+    return this.readContract.getPacket(id);
   }
 
   async createPacket(input: CreatePacketInput): Promise<TxResult> {

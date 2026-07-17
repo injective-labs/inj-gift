@@ -1,4 +1,4 @@
-import { ethers, Contract, BrowserProvider, Signer } from "ethers";
+import { ethers, Contract, BrowserProvider, Signer, type Provider } from "ethers";
 import { appError } from "@/domain/errors";
 import type { DistributionMode, GiftPacket } from "@/domain/types";
 import { injGiftAddress } from "../config";
@@ -11,7 +11,7 @@ type TxLike = { hash: string; wait?: () => Promise<{ logs?: Array<unknown> }> };
 export class InjGiftContractWrapper {
   private contract: Contract;
 
-  constructor(private signerOrProvider: Signer | BrowserProvider) {
+  constructor(private signerOrProvider: Signer | Provider) {
     if (!injGiftAddress) {
       throw appError(
         "INVALID_INPUT",
