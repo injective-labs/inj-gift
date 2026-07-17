@@ -132,6 +132,16 @@ class InjPassHostProvider implements Eip1193Provider {
     this.listeners.get(event)?.forEach((handler) => handler(...args));
   }
 
+  private rejectPending(message: string, code: number): void {
+    for (const [id, pending] of this.pending) {
+      clearTimeout(pending.timer);
+      const error = new Error(message) as Error & { code?: number };
+      error.code = code;
+      pending.reject(error);
+      this.pending.delete(id);
+    }
+  }
+
   private post(payload: Record<string, unknown>): void {
     window.parent.postMessage({ channel: INJPASS_MINIAPP_CHANNEL, ...payload }, this.parentOrigin);
   }
@@ -212,7 +222,14 @@ class InjPassHostProvider implements Eip1193Provider {
 
     if (message.type === "session") {
       const previous = this.session;
-      const next = message.session as InjPassHostSession;
+      const candidate = message.session as Partial<InjPassHostSession> | null;
+      if (
+        !candidate
+        || typeof candidate.authenticated !== "boolean"
+        || (candidate.address !== null && typeof candidate.address !== "string")
+        || typeof candidate.chainId !== "number"
+      ) return;
+      const next = candidate as InjPassHostSession;
       this.session = next;
       this.sessionListeners.forEach((listener) => listener(next));
       if (previous?.address !== next.address) {
@@ -220,6 +237,9 @@ class InjPassHostProvider implements Eip1193Provider {
       }
       if (previous?.chainId !== next.chainId) {
         this.emit("chainChanged", `0x${next.chainId.toString(16)}`);
+      }
+      if (!next.authenticated || !next.address) {
+        this.rejectPending("INJ Pass wallet session ended.", 4100);
       }
       return;
     }
