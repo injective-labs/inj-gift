@@ -19,7 +19,7 @@ interface PendingRequest {
   timer: ReturnType<typeof setTimeout>;
 }
 
-function readParentOrigin(): string | null {
+export function getInjpassHostOrigin(): string | null {
   if (typeof window === "undefined") return null;
   const configured = new URLSearchParams(window.location.search).get("injpass_host_origin");
   if (configured) {
@@ -266,7 +266,7 @@ let hostProvider: InjPassHostProvider | null = null;
 export function getInjpassHostProvider(): InjPassHostProvider | null {
   if (!isInjpassMiniAppHost()) return null;
   if (hostProvider) return hostProvider;
-  const parentOrigin = readParentOrigin();
+  const parentOrigin = getInjpassHostOrigin();
   if (!parentOrigin) return null;
   hostProvider = new InjPassHostProvider(parentOrigin);
   return hostProvider;

@@ -4,6 +4,7 @@ import { TxToast } from "../components/TxToast";
 import { EvmProvider } from "../providers/EvmProvider";
 import { I18nProvider } from "@/i18n";
 import localFont from "next/font/local";
+import { InjPassAgentBridge } from "@/components/InjPassAgentBridge";
 
 const bodyFont = localFont({
   src: [
@@ -64,6 +65,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       >
         <I18nProvider>
           <EvmProvider>
+            <InjPassAgentBridge />
             {app}
           </EvmProvider>
         </I18nProvider>
