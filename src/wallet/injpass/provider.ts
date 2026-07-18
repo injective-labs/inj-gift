@@ -23,6 +23,7 @@ import {
 let connector: InjPassConnector | null = null;
 let provider: Eip1193Provider | null = null;
 let connectedWalletMeta: { address: string; walletName?: string } | null = null;
+let hostSessionUnsubscribe: (() => void) | null = null;
 let connectPromise: Promise<{
   provider: Eip1193Provider;
   address: string;
@@ -115,16 +116,27 @@ export async function connectInjpass(): Promise<{
     if (isInjpassMiniAppHost()) {
       const hostedProvider = getInjpassHostProvider();
       if (!hostedProvider) throw new Error("INJ Pass host bridge is unavailable.");
-      const session = await hostedProvider.waitForSession();
-      if (!session.authenticated || !session.address) {
-        await hostedProvider.request({ method: "injpass_requestLogin" });
-        throw new Error("Log in to INJ Pass to use this mini app.");
-      }
+      const session = await hostedProvider.waitForAuthenticatedSession();
       provider = hostedProvider;
       connectedWalletMeta = {
         address: session.address,
         walletName: session.walletName,
       };
+      if (!hostSessionUnsubscribe) {
+        hostSessionUnsubscribe = hostedProvider.subscribe((nextSession) => {
+          if (nextSession.authenticated && nextSession.address) {
+            provider = hostedProvider;
+            connectedWalletMeta = {
+              address: nextSession.address,
+              walletName: nextSession.walletName,
+            };
+            return;
+          }
+          provider = null;
+          connectedWalletMeta = null;
+          connectPromise = null;
+        });
+      }
       installOnWindow(hostedProvider);
       return {
         provider: hostedProvider,
@@ -173,9 +185,10 @@ export async function connectInjpass(): Promise<{
       walletName: wallet.walletName,
     };
   })();
+  const pendingConnection = connectPromise;
 
   try {
-    return await connectPromise;
+    return await pendingConnection;
   } catch (e) {
     connectPromise = null;
     connector = null;
@@ -194,6 +207,8 @@ export function disconnectInjpass(): void {
     void getInjpassHostProvider()?.request({ method: "injpass_requestLogout" }).catch(() => undefined);
   }
   connector?.disconnect();
+  hostSessionUnsubscribe?.();
+  hostSessionUnsubscribe = null;
   provider = null;
   connector = null;
   connectedWalletMeta = null;

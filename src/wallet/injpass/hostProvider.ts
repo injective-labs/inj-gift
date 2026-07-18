@@ -11,6 +11,17 @@ export interface InjPassHostSession {
   chainId: number;
 }
 
+export type AuthenticatedInjPassHostSession = InjPassHostSession & {
+  authenticated: true;
+  address: string;
+};
+
+function isAuthenticatedSession(
+  session: InjPassHostSession | null,
+): session is AuthenticatedInjPassHostSession {
+  return session?.authenticated === true && typeof session.address === "string" && session.address.length > 0;
+}
+
 type EventHandler = (...args: unknown[]) => void;
 
 interface PendingRequest {
@@ -122,13 +133,13 @@ class InjPassHostProvider implements Eip1193Provider {
     });
   }
 
-  async waitForAuthenticatedSession(timeoutMs = 180_000): Promise<InjPassHostSession> {
+  async waitForAuthenticatedSession(timeoutMs = 180_000): Promise<AuthenticatedInjPassHostSession> {
     const initial = await this.waitForSession(Math.min(timeoutMs, 10_000));
-    if (initial.authenticated && initial.address) return initial;
+    if (isAuthenticatedSession(initial)) return initial;
 
     await this.request({ method: "injpass_requestLogin" });
     const current = this.session;
-    if (current?.authenticated && current.address) return current;
+    if (isAuthenticatedSession(current)) return current;
 
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
@@ -136,7 +147,7 @@ class InjPassHostProvider implements Eip1193Provider {
         reject(new Error("INJ Pass login was not completed."));
       }, timeoutMs);
       const unsubscribe = this.subscribe((session) => {
-        if (!session.authenticated || !session.address) return;
+        if (!isAuthenticatedSession(session)) return;
         clearTimeout(timeout);
         unsubscribe();
         resolve(session);
