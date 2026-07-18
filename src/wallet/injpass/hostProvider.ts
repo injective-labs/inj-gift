@@ -122,6 +122,28 @@ class InjPassHostProvider implements Eip1193Provider {
     });
   }
 
+  async waitForAuthenticatedSession(timeoutMs = 180_000): Promise<InjPassHostSession> {
+    const initial = await this.waitForSession(Math.min(timeoutMs, 10_000));
+    if (initial.authenticated && initial.address) return initial;
+
+    await this.request({ method: "injpass_requestLogin" });
+    const current = this.session;
+    if (current?.authenticated && current.address) return current;
+
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        unsubscribe();
+        reject(new Error("INJ Pass login was not completed."));
+      }, timeoutMs);
+      const unsubscribe = this.subscribe((session) => {
+        if (!session.authenticated || !session.address) return;
+        clearTimeout(timeout);
+        unsubscribe();
+        resolve(session);
+      });
+    });
+  }
+
   subscribe(listener: (session: InjPassHostSession) => void): () => void {
     this.sessionListeners.add(listener);
     if (this.session) queueMicrotask(() => listener(this.session as InjPassHostSession));
