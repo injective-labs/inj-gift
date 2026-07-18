@@ -16,6 +16,10 @@ import { useTx } from "../../../hooks/useTx";
 import { toast } from "sonner";
 import { normalizeError } from "../../../domain/normalizeError";
 import { useI18n, errorMessage } from "@/i18n";
+import {
+  packetLoadingMode,
+  type PacketFetchSource,
+} from "@/features/redpacket/domain/loadingState";
 
 export default function PacketDetailPage() {
   const { t: dict } = useI18n();
@@ -24,8 +28,11 @@ export default function PacketDetailPage() {
   const router = useRouter();
   const [data, setData] = useState<GiftPacket | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<any>(null);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState<{ message: string } | null>(null);
+  const dataRef = useRef<GiftPacket | null>(null);
+  const inFlightRef = useRef(false);
+  const requestSequenceRef = useRef(0);
   const [address, setAddress] = useState<string | null>(null);
 
   const { adapter } = useGiftAdapter();
@@ -35,9 +42,11 @@ export default function PacketDetailPage() {
 
   const isDemo = id === "demo";
 
-  const fetchPacket = useCallback(async () => {
+  const fetchPacket = useCallback(async (source: PacketFetchSource = "manual") => {
+    if (inFlightRef.current) return;
+
     if (isDemo) {
-      setData({
+      const demoPacket: GiftPacket = {
         id: "demo",
         creator: "inj1demoaddressxxxxxxxxxxxxxxxxxxxxxx",
         token: "0x0000000000000000000000000000000000000000",
@@ -48,7 +57,9 @@ export default function PacketDetailPage() {
         expiration: Math.floor(Date.now() / 1000) + 3600,
         mode: "random",
         isActive: true,
-      });
+      };
+      dataRef.current = demoPacket;
+      setData(demoPacket);
       return;
     }
 
@@ -58,24 +69,40 @@ export default function PacketDetailPage() {
       return;
     }
 
+    const requestSequence = ++requestSequenceRef.current;
+    const loadingMode = packetLoadingMode(dataRef.current !== null, source);
+    inFlightRef.current = true;
+    setIsLoading(loadingMode.blocking);
+    setIsRefreshing(loadingMode.refreshing);
+
     try {
-      if (!isLoading) setIsLoading(true);
       const packet = await adapter.getPacket(id);
+      if (requestSequence !== requestSequenceRef.current) return;
+      dataRef.current = packet;
       setData(packet);
       setError(null);
-    } catch (e: any) {
+    } catch (e: unknown) {
+      if (requestSequence !== requestSequenceRef.current) return;
       console.error("Fetch packet failed:", e);
       setError({ message: errorMessage(e, dict) });
     } finally {
-      setIsLoading(false);
+      if (requestSequence === requestSequenceRef.current) {
+        inFlightRef.current = false;
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
     }
-  }, [id, adapter, isDemo, isLoading, isEvm, dict, errors.invalidPacketId]);
+  }, [id, adapter, isDemo, isEvm, dict, errors.invalidPacketId]);
 
   useEffect(() => {
-    fetchPacket();
-    timerRef.current = setInterval(fetchPacket, 5000);
+    void fetchPacket("initial");
+    const timer = setInterval(() => {
+      void fetchPacket("poll");
+    }, 5000);
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
+      clearInterval(timer);
+      requestSequenceRef.current += 1;
+      inFlightRef.current = false;
     };
   }, [fetchPacket]);
 
@@ -188,8 +215,8 @@ export default function PacketDetailPage() {
         return { hash: res.hash };
       });
       toast.success(errors.refundInitiated);
-      fetchPacket();
-    } catch (e: any) {
+      void fetchPacket("manual");
+    } catch (e: unknown) {
       const err = normalizeError(e);
       toast.error(errorMessage(err, dict) || errors.refundFailed);
     }
@@ -234,15 +261,15 @@ export default function PacketDetailPage() {
                 </div>
               </div>
               <button
-                onClick={() => fetchPacket()}
+                onClick={() => void fetchPacket("manual")}
                 className="p-3 hover:bg-gray-100 rounded-xl transition-colors"
                 title={common.refresh}
               >
-                <RefreshCw className="w-5 h-5 text-gray-600" />
+                <RefreshCw className={`w-5 h-5 text-gray-600 ${isRefreshing ? "animate-spin" : ""}`} />
               </button>
             </div>
 
-            {isLoading && (
+            {isLoading && !data && (
               <div className="flex flex-col items-center justify-center py-16 space-y-4">
                 <Loader2 className="w-12 h-12 text-yellow-500 animate-spin" />
                 <p className="text-gray-600 font-medium">{common.loadingPacket}</p>
@@ -392,8 +419,4 @@ export default function PacketDetailPage() {
     </div>
   );
 }
-
-
-
-
 
