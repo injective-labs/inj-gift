@@ -2,6 +2,28 @@ import { appError, isAppError } from "./errors";
 import type { AppError } from "./errors";
 
 export const normalizeError = (e: unknown): AppError => {
+  if (e && typeof e === "object") {
+    const injPassCode = (e as Record<string, unknown>).code;
+    if (injPassCode === "USER_CANCELLED") {
+      return appError("USER_REJECTED", "User cancelled the INJ Pass connection", {
+        cause: e,
+        messageKey: "userRejected",
+      });
+    }
+    if (injPassCode === "POPUP_BLOCKED") {
+      return appError("NOT_SUPPORTED", "INJ Pass authorization popup was blocked", {
+        cause: e,
+        messageKey: "popupBlocked",
+      });
+    }
+    if (injPassCode === "CONNECTION_TIMEOUT") {
+      return appError("NOT_SUPPORTED", "INJ Pass connection timed out", {
+        cause: e,
+        messageKey: "connectionTimeout",
+      });
+    }
+  }
+
   if (isAppError(e)) {
     const msg = typeof e.message === "string" ? e.message.toLowerCase() : "";
     if (msg.includes("already-claimed")) {
@@ -75,5 +97,4 @@ export const normalizeError = (e: unknown): AppError => {
 
   return appError("UNKNOWN", "Unknown error", { cause: e });
 };
-
 
