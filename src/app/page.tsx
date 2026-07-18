@@ -1,6 +1,7 @@
 "use client";
 
 import { WalletButton } from "@/components/WalletButton";
+import { MineStats } from "@/components/MineStats";
 import {
   ArrowRight,
   ChevronDown,
@@ -708,27 +709,16 @@ function FeatureDetailPanel({
 
       {type === "mine" && (
         <div className="mt-8 space-y-6">
-          <div className="mt-8 grid gap-0 border-y border-amber-900/10 md:grid-cols-3">
-            {[
-              [panels.mine.records, myPackets.length],
-              [panels.mine.recent, myPackets[0] ? shortenId(myPackets[0].id, 6) : "-"],
-              [panels.mine.source, "Injective"],
-            ].map(([label, value], index) => (
-              <div
-                key={label}
-                className={`p-5 ${
-                  index < 2 ? "border-b border-amber-900/10 md:border-b-0 md:border-r" : ""
-                }`}
-              >
-                <p className="text-sm font-semibold text-amber-900/60">
-                  {label}
-                </p>
-                <p className="mt-2 text-3xl font-black text-amber-950">
-                  {value}
-                </p>
-              </div>
-            ))}
-          </div>
+          <MineStats
+            items={[
+              { label: panels.mine.records, value: myPackets.length },
+              {
+                label: panels.mine.recent,
+                value: myPackets[0] ? shortenId(myPackets[0].id, 6) : "-",
+              },
+              { label: panels.mine.source, value: "Injective" },
+            ]}
+          />
 
           <div className="flex flex-col gap-3 rounded-lg border border-amber-900/10 bg-white/55 p-4 md:flex-row md:items-end">
             <label className="block flex-1">
