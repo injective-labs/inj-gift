@@ -28,6 +28,7 @@ import { toast } from "sonner";
 import { useGiftAdapter } from "@/hooks/useGiftAdapter";
 import { useTx } from "@/hooks/useTx";
 import { isBytes32Hex, shortenId } from "@/lib/utils";
+import { syncCreatedPacket } from "@/client/gift/packetSync";
 import {
   useI18n,
   localeNames,
@@ -379,7 +380,11 @@ function FeatureDetailPanel({
 
       setCreatedTxHash(txHashValue ?? txHash);
       setCreatedPacketId(packetId ?? null);
-      if (packetId) saveMyPacket(packetId, txHashValue ?? txHash);
+      if (packetId) {
+        const createTxHash = txHashValue ?? txHash;
+        saveMyPacket(packetId, createTxHash);
+        await syncCreatedPacket({ packetId, txHash: createTxHash });
+      }
       toast.success(`${errors.createSuccess}: ${txHash.slice(0, 10)}...`);
     } catch (e: unknown) {
       toast.error(errorMessage(e, dict) || errors.createFailed);

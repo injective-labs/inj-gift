@@ -10,6 +10,7 @@ import { Modal } from "../../components/Modal";
 import { shortenId } from "../../lib/utils";
 import { ArrowLeft, Gift, Loader2, Sparkles, Clock, Coins, Key, Zap, Copy, Check, Share2 } from "lucide-react";
 import { useI18n, errorMessage } from "@/i18n";
+import { syncCreatedPacket } from "@/client/gift/packetSync";
 
 export default function CreatePage() {
   const { t: dict } = useI18n();
@@ -124,7 +125,11 @@ export default function CreatePage() {
       if (txHash) {
         setCreatedTxHash(txHashValue ?? txHash);
         setCreatedPacketId(packetId ?? null);
-        if (packetId) saveMyPacket(packetId, txHashValue ?? txHash);
+        if (packetId) {
+          const createTxHash = txHashValue ?? txHash;
+          saveMyPacket(packetId, createTxHash);
+          await syncCreatedPacket({ packetId, txHash: createTxHash });
+        }
         setSuccessOpen(true);
         toast.success(`${errors.createSuccess}: ${txHash.slice(0, 10)}...`);
       }
@@ -415,7 +420,6 @@ export default function CreatePage() {
     </div>
   );
 }
-
 
 
 
