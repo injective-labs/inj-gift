@@ -44,6 +44,24 @@ describe("connectInjpass in an INJ Pass mini app", () => {
     });
   });
 
+  it("does not replace or call an installed extension provider", async () => {
+    const extension = { isMetaMask: true, request: vi.fn() };
+    Object.defineProperty(window, "ethereum", {
+      configurable: true,
+      writable: true,
+      value: extension,
+    });
+    const { connectInjpass, getInjpassEip1193 } = await import(
+      "@/wallet/injpass/provider"
+    );
+
+    const result = await connectInjpass();
+
+    expect(window.ethereum).toBe(extension);
+    expect(extension.request).not.toHaveBeenCalled();
+    expect(getInjpassEip1193()).toBe(result.provider);
+  });
+
   it("tracks wallet switches and logout from the global host session", async () => {
     const { connectInjpass, isInjpassConnected } = await import("@/wallet/injpass/provider");
     await connectInjpass();
