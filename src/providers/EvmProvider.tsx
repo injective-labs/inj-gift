@@ -25,10 +25,7 @@ export function EvmProvider({ children }: { children: ReactNode }) {
   }));
 
   return (
-    // reconnectOnMount is disabled: with only the generic injected connector,
-    // auto-reconnect would silently grab an installed extension (MetaMask/OKX)
-    // off window.ethereum on load and masquerade as "connected". INJ Pass is
-    // connected explicitly via connectInjpass() instead.
+    // INJ Pass connections are restored explicitly through connectInjpass().
     <WagmiProvider config={wagmiConfig} reconnectOnMount={false}>
       <QueryClientProvider client={queryClient}>
         {children}
@@ -36,4 +33,3 @@ export function EvmProvider({ children }: { children: ReactNode }) {
     </WagmiProvider>
   );
 }
-

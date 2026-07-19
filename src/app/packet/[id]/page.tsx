@@ -116,11 +116,7 @@ export default function PacketDetailPage() {
         return;
       }
 
-      // Prefer the INJ Pass provider over the raw window.ethereum global so we
-      // display the INJ Pass account, not a MetaMask/OKX extension's account.
-      const eip1193 =
-        getInjpassEip1193() ??
-        (typeof window !== "undefined" ? window.ethereum : undefined);
+      const eip1193 = getInjpassEip1193();
       if (eip1193) {
         try {
           const provider = new ethers.BrowserProvider(eip1193);
@@ -419,4 +415,3 @@ export default function PacketDetailPage() {
     </div>
   );
 }
-

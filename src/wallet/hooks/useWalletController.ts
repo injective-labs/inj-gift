@@ -105,10 +105,8 @@ export function useWalletController(): WalletController {
           return;
         }
 
-        // INJ Pass: spin up the embedded wallet (iframe + passkey popup) and
-        // install its provider on window.ethereum before the injected connector
-        // reads it. If wagmi auto-reconnected to an extension, drop it first so
-        // the injected connector re-reads the freshly installed INJ Pass provider.
+        // Spin up the embedded wallet before asking the connector for its
+        // explicitly targeted INJ Pass provider.
         if (walletId === "injpass") {
           if (accountStatus === "connected") {
             try {
