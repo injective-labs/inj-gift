@@ -12,6 +12,10 @@ import { ArrowLeft, Gift, Loader2, Sparkles, Clock, Coins, Key, Zap, Copy, Check
 import { useI18n, errorMessage } from "@/i18n";
 import { useMyPackets } from "@/features/my-packets/useMyPackets";
 import { formatShareText } from "@/features/share/shareText";
+import {
+  getPacketPasscode,
+  rememberPacketPasscode,
+} from "@/client/gift/passcodeStore";
 
 export default function CreatePage() {
   const { t: dict } = useI18n();
@@ -108,6 +112,11 @@ export default function CreatePage() {
           const createTxHash = txHashValue ?? txHash;
           const synced = await recordCreatedPacket({ packetId, txHash: createTxHash });
           setCreatedShareCode(synced?.shareCode ?? null);
+          rememberPacketPasscode({
+            packetId,
+            shareCode: synced?.shareCode,
+            passcode: password,
+          });
         }
         setSuccessOpen(true);
         toast.success(`${errors.createSuccess}: ${txHash.slice(0, 10)}...`);
@@ -127,10 +136,14 @@ export default function CreatePage() {
   const copyClaimLink = async () => {
     if (!createdPacketId) return;
     const reference = createdShareCode ?? createdPacketId;
+    const passcode = getPacketPasscode({
+      packetId: createdPacketId,
+      shareCode: createdShareCode ?? undefined,
+    }) ?? password;
     const link = `${window.location.origin}/claim/${reference}`;
     await navigator.clipboard.writeText(formatShareText({
       url: link,
-      passcode: password,
+      passcode,
     }));
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 1500);

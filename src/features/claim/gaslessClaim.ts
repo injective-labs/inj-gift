@@ -40,6 +40,8 @@ function defaultRelayerUrl(): string {
   return "/api/gift/claims/relay";
 }
 
+const defaultFetcher: typeof fetch = (input, init) => globalThis.fetch(input, init);
+
 export async function claimPacketGasless(
   input: {
     packetId: string;
@@ -52,7 +54,7 @@ export async function claimPacketGasless(
   const dependencies: Dependencies = {
     connect: overrides.connect ?? connectInjpass,
     readNonce: overrides.readNonce ?? defaultReadNonce,
-    fetcher: overrides.fetcher ?? fetch,
+    fetcher: overrides.fetcher ?? defaultFetcher,
     now: overrides.now ?? Date.now,
     relayerUrl: overrides.relayerUrl ?? defaultRelayerUrl(),
   };

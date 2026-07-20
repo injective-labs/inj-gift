@@ -1,8 +1,12 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { GiftAdapter } from "@/domain/giftAdapter";
 import { claimPacketGasless, claimPacketReference } from "./gaslessClaim";
 
 describe("claimPacketGasless", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("signs a claimer-bound permit and sends it to the relayer", async () => {
     const address = "0x1111111111111111111111111111111111111111";
     const contractAddress = "0x294cDD0Ac5B2ef8b23E2dc3A993E133356Ee72D5";
@@ -37,6 +41,33 @@ describe("claimPacketGasless", () => {
       expect.objectContaining({ method: "POST" }),
     );
     expect(result.hash).toBe(`0x${"44".repeat(32)}`);
+  });
+
+  it("calls the browser fetch implementation with the global context", async () => {
+    const address = "0x1111111111111111111111111111111111111111";
+    const contractAddress = "0x294cDD0Ac5B2ef8b23E2dc3A993E133356Ee72D5";
+    const packetId = `0x${"22".repeat(32)}`;
+    vi.stubGlobal("fetch", function browserFetch(this: unknown) {
+      if (this !== globalThis) throw new TypeError("Illegal invocation");
+      return Promise.resolve(
+        Response.json({ transactionHash: `0x${"44".repeat(32)}` }),
+      );
+    });
+
+    await expect(
+      claimPacketGasless(
+        { packetId, password: "lucky", contractAddress, chainId: 1776 },
+        {
+          connect: vi.fn().mockResolvedValue({
+            address,
+            provider: {
+              request: vi.fn().mockResolvedValue(`0x${"33".repeat(65)}`),
+            },
+          }),
+          readNonce: vi.fn().mockResolvedValue(0n),
+        },
+      ),
+    ).resolves.toEqual({ hash: `0x${"44".repeat(32)}` });
   });
 });
 

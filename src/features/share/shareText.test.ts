@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  formatShareText,
-  parseClaimShareInput,
-  parseSharePasscode,
-} from "./shareText";
+import { formatShareText, parseSharePasscode } from "./shareText";
 
 describe("formatShareText", () => {
   it("returns one directly navigable URL containing the passcode", () => {
@@ -17,14 +13,5 @@ describe("formatShareText", () => {
 
   it("restores the passcode from a share URL fragment", () => {
     expect(parseSharePasscode("#passcode=lucky+gift")).toBe("lucky gift");
-  });
-
-  it("recovers the reference and passcode from legacy pasted share text", () => {
-    expect(
-      parseClaimShareInput("XgHCPbq9 Claim passcode: hihi", ""),
-    ).toEqual({
-      reference: "XgHCPbq9",
-      passcode: "hihi",
-    });
   });
 });

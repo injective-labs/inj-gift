@@ -8,6 +8,8 @@ import { toast } from "sonner";
 import { shortenId } from "../../lib/utils";
 import { useI18n } from "@/i18n";
 import { useMyPackets } from "@/features/my-packets/useMyPackets";
+import { getPacketPasscode } from "@/client/gift/passcodeStore";
+import { formatShareText } from "@/features/share/shareText";
 
 export default function PacketIndexPage() {
   const { t } = useI18n();
@@ -18,8 +20,13 @@ export default function PacketIndexPage() {
 
   const copyClaimLink = async (id: string) => {
     const item = myPackets.find((packet) => packet.packetId === id);
+    const passcode = item ? getPacketPasscode(item) : null;
+    if (!passcode) {
+      toast.error(errors.enterPasscode);
+      return;
+    }
     const link = `${window.location.origin}/claim/${item?.shareCode ?? id}`;
-    await navigator.clipboard.writeText(link);
+    await navigator.clipboard.writeText(formatShareText({ url: link, passcode }));
     toast.success(errors.copyShareSuccess);
   };
 

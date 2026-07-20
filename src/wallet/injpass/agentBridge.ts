@@ -1,8 +1,10 @@
 import { ethers } from "ethers";
 import { syncCreatedPacket } from "@/client/gift/packetSync";
+import { rememberPacketPasscode } from "@/client/gift/passcodeStore";
 import type { GiftAdapter } from "@/domain/giftAdapter";
 import { claimPacketReference } from "@/features/claim/gaslessClaim";
 import { resolvePacketReference } from "@/features/my-packets/client";
+import { formatShareText } from "@/features/share/shareText";
 import type { InjPassHostSession } from "@/wallet/injpass/hostProvider";
 
 export interface InjGiftAgentCommand {
@@ -84,6 +86,13 @@ export async function executeInjGiftAgentCommand(
           })
         : null;
       const shareReference = synced?.shareCode ?? result.packetId;
+      if (result.packetId) {
+        rememberPacketPasscode({
+          packetId: result.packetId,
+          shareCode: synced?.shareCode,
+          passcode: params.password.trim(),
+        });
+      }
       const shareOrigin = dependencies.shareOrigin
         ?? (typeof window === "undefined" ? "" : window.location.origin);
       return {
@@ -94,7 +103,10 @@ export async function executeInjGiftAgentCommand(
           packetId: result.packetId,
           shareCode: synced?.shareCode,
           shareUrl: shareReference
-            ? `${shareOrigin}/claim/${shareReference}`
+            ? formatShareText({
+                url: `${shareOrigin}/claim/${shareReference}`,
+                passcode: params.password.trim(),
+              })
             : undefined,
           password: params.password.trim(),
           amount,

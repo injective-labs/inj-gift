@@ -66,7 +66,7 @@ describe("executeInjGiftAgentCommand", () => {
       data: {
         transactionHash: "0xcreate",
         shareCode: "4ERuUi6m",
-        shareUrl: "https://gift.example/claim/4ERuUi6m",
+        shareUrl: "https://gift.example/claim/4ERuUi6m#passcode=lucky",
       },
     });
   });

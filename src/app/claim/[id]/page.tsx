@@ -15,13 +15,13 @@ import type { GiftPacket } from "../../../domain/types";
 import { useI18n, errorMessage } from "@/i18n";
 import { claimPacketReference } from "@/features/claim/gaslessClaim";
 import { resolvePacketReference } from "@/features/my-packets/client";
-import { formatShareText, parseClaimShareInput } from "@/features/share/shareText";
+import { formatShareText, parseSharePasscode } from "@/features/share/shareText";
 
 export default function ClaimPage() {
   const { t: dict } = useI18n();
   const { claimDetail: tc, common, errors, status } = dict;
   const params = useParams<{ id: string }>();
-  const packetId = parseClaimShareInput(params.id, "").reference;
+  const packetId = params.id;
   const router = useRouter();
   const isDemo = packetId === "demo";
 
@@ -41,12 +41,9 @@ export default function ClaimPage() {
   const [statusError, setStatusError] = useState<string | null>(null);
 
   useEffect(() => {
-    const sharedPasscode = parseClaimShareInput(
-      params.id,
-      window.location.hash,
-    ).passcode;
+    const sharedPasscode = parseSharePasscode(window.location.hash);
     if (sharedPasscode) setPassword(sharedPasscode);
-  }, [params.id]);
+  }, []);
 
   useEffect(() => {
     if (isDemo) {

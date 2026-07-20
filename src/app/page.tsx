@@ -31,6 +31,10 @@ import { claimPacketReference } from "@/features/claim/gaslessClaim";
 import { useMyPackets } from "@/features/my-packets/useMyPackets";
 import { formatShareText } from "@/features/share/shareText";
 import {
+  getPacketPasscode,
+  rememberPacketPasscode,
+} from "@/client/gift/passcodeStore";
+import {
   useI18n,
   localeNames,
   localeOrder,
@@ -337,6 +341,11 @@ function FeatureDetailPanel({
           txHash: createTxHash,
         });
         setCreatedShareCode(synced?.shareCode ?? null);
+        rememberPacketPasscode({
+          packetId,
+          shareCode: synced?.shareCode,
+          passcode: password,
+        });
       }
       toast.success(`${errors.createSuccess}: ${txHash.slice(0, 10)}...`);
     } catch (e: unknown) {
@@ -354,9 +363,13 @@ function FeatureDetailPanel({
   const copyClaimLink = async () => {
     if (!createdPacketId) return;
     const reference = createdShareCode ?? createdPacketId;
+    const passcode = getPacketPasscode({
+      packetId: createdPacketId,
+      shareCode: createdShareCode ?? undefined,
+    }) ?? password;
     await navigator.clipboard.writeText(formatShareText({
       url: `${window.location.origin}/claim/${reference}`,
-      passcode: password,
+      passcode,
     }));
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 1500);
@@ -399,8 +412,20 @@ function FeatureDetailPanel({
     }
   };
 
-  const copyStoredClaimLink = async (reference: string) => {
-    await navigator.clipboard.writeText(`${window.location.origin}/claim/${reference}`);
+  const copyStoredClaimLink = async (item: {
+    packetId: string;
+    shareCode?: string;
+  }) => {
+    const passcode = getPacketPasscode(item);
+    if (!passcode) {
+      toast.error(errors.enterPasscode);
+      return;
+    }
+    const reference = item.shareCode ?? item.packetId;
+    await navigator.clipboard.writeText(formatShareText({
+      url: `${window.location.origin}/claim/${reference}`,
+      passcode,
+    }));
     toast.success(errors.copyLinkSuccess);
   };
 
@@ -738,7 +763,7 @@ function FeatureDetailPanel({
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => copyStoredClaimLink(item.shareCode ?? item.packetId)}
+                        onClick={() => copyStoredClaimLink(item)}
                         className="rounded-md bg-white px-3 py-2 text-xs font-bold text-amber-950"
                         title={common.copyShareLink}
                       >
