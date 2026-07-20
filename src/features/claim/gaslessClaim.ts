@@ -42,6 +42,25 @@ function defaultRelayerUrl(): string {
 
 const defaultFetcher: typeof fetch = (input, init) => globalThis.fetch(input, init);
 
+async function relayErrorMessage(response: Response): Promise<string> {
+  const fallback = `INJ Gift relayer returned ${response.status}`;
+  try {
+    const payload = await response.json() as {
+      error?: { message?: unknown };
+    };
+    if (
+      payload.error
+      && typeof payload.error.message === "string"
+      && payload.error.message.trim()
+    ) {
+      return payload.error.message;
+    }
+  } catch {
+    return fallback;
+  }
+  return fallback;
+}
+
 export async function claimPacketGasless(
   input: {
     packetId: string;
@@ -115,7 +134,7 @@ export async function claimPacketGasless(
     }),
   });
   if (!response.ok) {
-    throw new Error(`INJ Gift relayer returned ${response.status}`);
+    throw new Error(await relayErrorMessage(response));
   }
   const payload = (await response.json()) as { transactionHash: string };
   return { hash: payload.transactionHash };

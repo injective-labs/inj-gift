@@ -27,8 +27,8 @@ importers:
         specifier: ^1.14.41
         version: 1.14.41(cb8a6e80f2c176db0254883bb0eb4631)
       '@injpass/cli':
-        specifier: ^2.5.2
-        version: 2.5.2
+        specifier: 2.7.0
+        version: 2.7.0
       '@radix-ui/react-dialog':
         specifier: ^1.1.15
         version: 1.1.15(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
@@ -1643,8 +1643,8 @@ packages:
   '@injectivelabs/wallet-ts@1.14.41':
     resolution: {integrity: sha512-xS5ABew7VUy6e4gRICL+KeH1NZJ90h2NkT2R2LIr5UyzrtjfF30sYrJFfEFxXJpd87+1uPjC/FpSav3AdTMReQ==}
 
-  '@injpass/cli@2.5.2':
-    resolution: {integrity: sha512-HLHvC+YZgt0yXWYqONMIV7w9u88b23XqpM+umOA5qe3WL/AKoXasiHVn/KHbb4wmCzv1eliM9+wOjhu+9Ym78w==}
+  '@injpass/cli@2.7.0':
+    resolution: {integrity: sha512-AIhmCm7u4owTkzexdEa7N0S331nmJvZYwnWyXnUkUFk21ClevWTfq/ZfQvv5fG7sPE914N7IeCJEJrFGGPlYgg==}
 
   '@isaacs/fs-minipass@4.0.1':
     resolution: {integrity: sha512-wgm9Ehl2jpeqP3zw/7mo3kRHFp5MEDhqAdwy1fTGkHAwnkGOVsgpvQhL8B5n1qlb01jV3n/bI0ZfZp5lWA1k4w==}
@@ -12039,7 +12039,7 @@ snapshots:
       - ws
       - zod
 
-  '@injpass/cli@2.5.2': {}
+  '@injpass/cli@2.7.0': {}
 
   '@isaacs/fs-minipass@4.0.1':
     dependencies:

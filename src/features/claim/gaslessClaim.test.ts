@@ -69,6 +69,39 @@ describe("claimPacketGasless", () => {
       ),
     ).resolves.toEqual({ hash: `0x${"44".repeat(32)}` });
   });
+
+  it("surfaces the relayer rejection reason", async () => {
+    await expect(
+      claimPacketGasless(
+        {
+          packetId: `0x${"22".repeat(32)}`,
+          password: "wrong",
+          contractAddress: "0x294cDD0Ac5B2ef8b23E2dc3A993E133356Ee72D5",
+          chainId: 1776,
+        },
+        {
+          connect: vi.fn().mockResolvedValue({
+            address: "0x1111111111111111111111111111111111111111",
+            provider: {
+              request: vi.fn().mockResolvedValue(`0x${"33".repeat(65)}`),
+            },
+          }),
+          readNonce: vi.fn().mockResolvedValue(0n),
+          fetcher: vi.fn().mockResolvedValue(
+            Response.json(
+              {
+                error: {
+                  code: "RELAY_REJECTED",
+                  message: "Claim permit signer is invalid",
+                },
+              },
+              { status: 400 },
+            ),
+          ),
+        },
+      ),
+    ).rejects.toThrow("Claim permit signer is invalid");
+  });
 });
 
 describe("claimPacketReference", () => {

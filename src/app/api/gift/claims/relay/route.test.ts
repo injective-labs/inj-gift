@@ -38,4 +38,28 @@ describe("POST /api/gift/claims/relay", () => {
     expect(response.status).toBe(400);
     expect(relay).not.toHaveBeenCalled();
   });
+
+  it("returns the safe relayer rejection reason", async () => {
+    const response = await createRelayGiftClaimRoute({
+      relay: vi.fn().mockRejectedValue(
+        Object.assign(new Error("Claim permit nonce is stale"), {
+          name: "GiftRelayError",
+          status: 400,
+        }),
+      ),
+    })(
+      new Request("https://gift.example/api/gift/claims/relay", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: {
+        code: "RELAY_REJECTED",
+        message: "Claim permit nonce is stale",
+      },
+    });
+  });
 });

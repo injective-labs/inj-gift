@@ -21,6 +21,15 @@ type Dependencies = {
   relay(input: RelayClaimInput): Promise<{ transactionHash: string }>;
 };
 
+function isGiftRelayError(error: unknown): error is GiftRelayError {
+  return error instanceof GiftRelayError || (
+    error instanceof Error
+    && error.name === "GiftRelayError"
+    && "status" in error
+    && typeof error.status === "number"
+  );
+}
+
 export function createRelayGiftClaimRoute(dependencies: Dependencies) {
   return async function post(request: Request): Promise<Response> {
     try {
@@ -33,7 +42,7 @@ export function createRelayGiftClaimRoute(dependencies: Dependencies) {
           { status: 400 },
         );
       }
-      if (error instanceof GiftRelayError) {
+      if (isGiftRelayError(error)) {
         return Response.json(
           { error: { code: "RELAY_REJECTED", message: error.message } },
           { status: error.status },
