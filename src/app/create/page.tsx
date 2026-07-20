@@ -14,7 +14,7 @@ import { useMyPackets } from "@/features/my-packets/useMyPackets";
 import { formatShareText } from "@/features/share/shareText";
 
 export default function CreatePage() {
-  const { t: dict, locale } = useI18n();
+  const { t: dict } = useI18n();
   const { create: tc, form, common, errors } = dict;
   const { adapter } = useGiftAdapter();
   const { run: runTx, state: txState } = useTx();
@@ -131,7 +131,6 @@ export default function CreatePage() {
     await navigator.clipboard.writeText(formatShareText({
       url: link,
       passcode: password,
-      locale,
     }));
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 1500);
@@ -404,5 +403,3 @@ export default function CreatePage() {
     </div>
   );
 }
-
-

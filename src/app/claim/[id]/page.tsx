@@ -15,13 +15,13 @@ import type { GiftPacket } from "../../../domain/types";
 import { useI18n, errorMessage } from "@/i18n";
 import { claimPacketReference } from "@/features/claim/gaslessClaim";
 import { resolvePacketReference } from "@/features/my-packets/client";
-import { formatShareText } from "@/features/share/shareText";
+import { formatShareText, parseClaimShareInput } from "@/features/share/shareText";
 
 export default function ClaimPage() {
-  const { t: dict, locale } = useI18n();
+  const { t: dict } = useI18n();
   const { claimDetail: tc, common, errors, status } = dict;
   const params = useParams<{ id: string }>();
-  const packetId = params.id;
+  const packetId = parseClaimShareInput(params.id, "").reference;
   const router = useRouter();
   const isDemo = packetId === "demo";
 
@@ -39,6 +39,14 @@ export default function ClaimPage() {
   const [resolvedPacketId, setResolvedPacketId] = useState<string | null>(null);
   const [statusLoading, setStatusLoading] = useState(false);
   const [statusError, setStatusError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const sharedPasscode = parseClaimShareInput(
+      params.id,
+      window.location.hash,
+    ).passcode;
+    if (sharedPasscode) setPassword(sharedPasscode);
+  }, [params.id]);
 
   useEffect(() => {
     if (isDemo) {
@@ -136,7 +144,6 @@ export default function ClaimPage() {
     await navigator.clipboard.writeText(formatShareText({
       url: link,
       passcode: password,
-      locale,
     }));
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 1500);
@@ -371,4 +378,3 @@ export default function ClaimPage() {
     </div>
   );
 }
-

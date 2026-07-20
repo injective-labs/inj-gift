@@ -235,7 +235,7 @@ function FeatureDetailPanel({
   panelRef?: Ref<HTMLDivElement>;
   type: FeatureType;
 }) {
-  const { t: dict, locale } = useI18n();
+  const { t: dict } = useI18n();
   const { common, form, errors } = dict;
   const panels = dict.panel;
   const panel = panels[type];
@@ -357,7 +357,6 @@ function FeatureDetailPanel({
     await navigator.clipboard.writeText(formatShareText({
       url: `${window.location.origin}/claim/${reference}`,
       passcode: password,
-      locale,
     }));
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 1500);

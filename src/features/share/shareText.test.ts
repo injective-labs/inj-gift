@@ -1,26 +1,30 @@
 import { describe, expect, it } from "vitest";
-import { formatShareText } from "./shareText";
+import {
+  formatShareText,
+  parseClaimShareInput,
+  parseSharePasscode,
+} from "./shareText";
 
 describe("formatShareText", () => {
-  it("includes the claim URL and passcode in Chinese", () => {
+  it("returns one directly navigable URL containing the passcode", () => {
     expect(
       formatShareText({
         url: "https://gift.injpass.com/claim/3kP9xQ7m",
-        passcode: "lucky",
-        locale: "zh",
+        passcode: "lucky gift",
       }),
-    ).toBe(
-      "领取链接：https://gift.injpass.com/claim/3kP9xQ7m\n领取口令：lucky",
-    );
+    ).toBe("https://gift.injpass.com/claim/3kP9xQ7m#passcode=lucky+gift");
   });
 
-  it("uses share wording in English", () => {
+  it("restores the passcode from a share URL fragment", () => {
+    expect(parseSharePasscode("#passcode=lucky+gift")).toBe("lucky gift");
+  });
+
+  it("recovers the reference and passcode from legacy pasted share text", () => {
     expect(
-      formatShareText({
-        url: "https://gift.injpass.com/claim/3kP9xQ7m",
-        passcode: "lucky",
-        locale: "en",
-      }),
-    ).toContain("Claim passcode: lucky");
+      parseClaimShareInput("XgHCPbq9 Claim passcode: hihi", ""),
+    ).toEqual({
+      reference: "XgHCPbq9",
+      passcode: "hihi",
+    });
   });
 });
