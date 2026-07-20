@@ -1,7 +1,11 @@
 import { z } from "zod";
 import { getGiftPool } from "@/server/gift/db";
 import { getGiftServerConfig } from "@/server/gift/config";
-import { upsertGiftPacket, type GiftPacketRecord } from "@/server/gift/packetRepository";
+import {
+  listGiftPackets,
+  upsertGiftPacket,
+  type GiftPacketRecord,
+} from "@/server/gift/packetRepository";
 import { createGiftChainReader, GiftVerificationError, verifyCreatedPacket } from "@/server/gift/verifyCreatedPacket";
 
 export const runtime = "nodejs";
@@ -14,6 +18,10 @@ const bodySchema = z.object({
 type Dependencies = {
   verify(input: { packetId: string; txHash: string }): Promise<GiftPacketRecord>;
   upsert(record: GiftPacketRecord): Promise<GiftPacketRecord>;
+};
+
+type GetDependencies = {
+  list(creatorAddress: string): Promise<GiftPacketRecord[]>;
 };
 
 export function createPostGiftPacket(dependencies: Dependencies) {
@@ -36,11 +44,49 @@ export function createPostGiftPacket(dependencies: Dependencies) {
   };
 }
 
+const creatorSchema = z.string().regex(/^0x[a-f0-9]{40}$/i);
+
+export function createGetGiftPackets(dependencies: GetDependencies) {
+  return async function get(request: Request): Promise<Response> {
+    const parsed = creatorSchema.safeParse(
+      new URL(request.url).searchParams.get("creator"),
+    );
+    if (!parsed.success) {
+      return Response.json(
+        { error: { code: "INVALID_INPUT", message: "Invalid creator address" } },
+        { status: 400 },
+      );
+    }
+    try {
+      const packets = await dependencies.list(parsed.data.toLowerCase());
+      return Response.json({ packets });
+    } catch (error) {
+      console.error("[inj-gift] packet listing failed", error);
+      return Response.json(
+        {
+          error: {
+            code: "PERSISTENCE_UNAVAILABLE",
+            message: "Packet persistence is temporarily unavailable",
+          },
+        },
+        { status: 503 },
+      );
+    }
+  };
+}
+
 export async function POST(request: Request): Promise<Response> {
   const config = getGiftServerConfig();
   const reader = createGiftChainReader(config);
   return createPostGiftPacket({
     verify: (input) => verifyCreatedPacket(input as { packetId: `0x${string}`; txHash: `0x${string}` }, config, reader),
     upsert: (record) => upsertGiftPacket(getGiftPool(), record),
+  })(request);
+}
+
+export async function GET(request: Request): Promise<Response> {
+  return createGetGiftPackets({
+    list: (creatorAddress) =>
+      listGiftPackets(getGiftPool(), creatorAddress),
   })(request);
 }

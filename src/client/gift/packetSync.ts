@@ -1,4 +1,8 @@
 export type PacketSyncItem = { packetId: string; txHash: string };
+export type SyncedPacket = PacketSyncItem & {
+  shareCode?: string;
+  [key: string]: unknown;
+};
 
 const OUTBOX_KEY = "injgift.packetSyncOutbox";
 
@@ -17,7 +21,7 @@ function queue(item: PacketSyncItem) {
 export async function syncCreatedPacket(
   item: PacketSyncItem,
   fetcher: typeof fetch = fetch,
-): Promise<boolean> {
+): Promise<SyncedPacket | null> {
   try {
     const response = await fetcher("/api/gift/packets", {
       method: "POST",
@@ -26,11 +30,36 @@ export async function syncCreatedPacket(
     });
     if (!response.ok) {
       queue(item);
-      return false;
+      return null;
     }
-    return true;
+    const payload = (await response.json()) as { packet?: SyncedPacket };
+    return payload.packet ?? null;
   } catch {
     queue(item);
-    return false;
+    return null;
+  }
+}
+
+export async function flushPacketSyncOutbox(
+  fetcher: typeof fetch = fetch,
+): Promise<void> {
+  if (typeof window === "undefined") return;
+  let items: PacketSyncItem[];
+  try {
+    items = JSON.parse(localStorage.getItem(OUTBOX_KEY) ?? "[]") as PacketSyncItem[];
+  } catch {
+    localStorage.removeItem(OUTBOX_KEY);
+    return;
+  }
+  const remaining: PacketSyncItem[] = [];
+  for (const item of items) {
+    if (!(await syncCreatedPacket(item, fetcher))) {
+      remaining.push(item);
+    }
+  }
+  if (remaining.length) {
+    localStorage.setItem(OUTBOX_KEY, JSON.stringify(remaining));
+  } else {
+    localStorage.removeItem(OUTBOX_KEY);
   }
 }

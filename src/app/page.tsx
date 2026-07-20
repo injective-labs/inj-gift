@@ -17,7 +17,6 @@ import {
   Search,
   Send,
   Share2,
-  Trash2,
   WalletCards,
   Zap,
 } from "lucide-react";
@@ -27,8 +26,10 @@ import { useEffect, useMemo, useRef, useState, type Ref } from "react";
 import { toast } from "sonner";
 import { useGiftAdapter } from "@/hooks/useGiftAdapter";
 import { useTx } from "@/hooks/useTx";
-import { isBytes32Hex, shortenId } from "@/lib/utils";
-import { syncCreatedPacket } from "@/client/gift/packetSync";
+import { shortenId } from "@/lib/utils";
+import { claimPacketReference } from "@/features/claim/gaslessClaim";
+import { useMyPackets } from "@/features/my-packets/useMyPackets";
+import { formatShareText } from "@/features/share/shareText";
 import {
   useI18n,
   localeNames,
@@ -48,17 +49,6 @@ type FeaturedPacket = {
   denom: "INJ";
   passcode: string;
   claimDurationsMs: number[];
-};
-
-type MyPacket = {
-  id: string;
-  createdAt: number;
-  amountInj?: string;
-  count?: number;
-  mode?: string;
-  expiresAt?: string;
-  token?: string;
-  txHash?: string | null;
 };
 
 const packetPresets: FeaturedPacket[] = [
@@ -101,27 +91,6 @@ const packetPresets: FeaturedPacket[] = [
 ];
 
 const defaultPacket = packetPresets[0];
-
-const readMyPackets = (): MyPacket[] => {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem("injgift.myPackets");
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as MyPacket[];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-};
-
-const writeMyPackets = (list: MyPacket[]) => {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem("injgift.myPackets", JSON.stringify(list));
-  } catch {
-    return;
-  }
-};
 
 const defaultExpiresAt = () => {
   const d = new Date(Date.now() + 24 * 60 * 60 * 1000);
@@ -266,7 +235,7 @@ function FeatureDetailPanel({
   panelRef?: Ref<HTMLDivElement>;
   type: FeatureType;
 }) {
-  const { t: dict } = useI18n();
+  const { t: dict, locale } = useI18n();
   const { common, form, errors } = dict;
   const panels = dict.panel;
   const panel = panels[type];
@@ -281,6 +250,7 @@ function FeatureDetailPanel({
   const [expiresAt, setExpiresAt] = useState(defaultExpiresAt);
   const [mode, setMode] = useState<PacketMode>("random");
   const [createdPacketId, setCreatedPacketId] = useState<string | null>(null);
+  const [createdShareCode, setCreatedShareCode] = useState<string | null>(null);
   const [createdTxHash, setCreatedTxHash] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
@@ -289,36 +259,16 @@ function FeatureDetailPanel({
   const [claimTxHash, setClaimTxHash] = useState<string | null>(null);
   const [claimAmount, setClaimAmount] = useState<string | null>(null);
   const [packetIdQuery, setPacketIdQuery] = useState("");
-  const [myPackets, setMyPackets] = useState<MyPacket[]>([]);
+  const {
+    packets: myPackets,
+    refresh: refreshMyPackets,
+    recordCreatedPacket,
+  } = useMyPackets();
   const createLoading =
     createTxState.status === "signing" || createTxState.status === "pending";
   const claimLoading =
     claimTxState.status === "signing" || claimTxState.status === "pending";
   const isEvm = adapter.stack === "evm";
-
-  useEffect(() => {
-    setMyPackets(readMyPackets());
-  }, []);
-
-  const saveMyPacket = (id: string, txHash: string | null) => {
-    const list = readMyPackets();
-    if (list.some((item) => item.id === id)) return;
-    const next = [
-      {
-        id,
-        createdAt: Date.now(),
-        amountInj,
-        count,
-        mode,
-        expiresAt,
-        token: denomOrCw20.trim(),
-        txHash,
-      },
-      ...list,
-    ];
-    writeMyPackets(next);
-    setMyPackets(next);
-  };
 
   const handleCreate = async () => {
     if (adapterError) {
@@ -382,8 +332,11 @@ function FeatureDetailPanel({
       setCreatedPacketId(packetId ?? null);
       if (packetId) {
         const createTxHash = txHashValue ?? txHash;
-        saveMyPacket(packetId, createTxHash);
-        await syncCreatedPacket({ packetId, txHash: createTxHash });
+        const synced = await recordCreatedPacket({
+          packetId,
+          txHash: createTxHash,
+        });
+        setCreatedShareCode(synced?.shareCode ?? null);
       }
       toast.success(`${errors.createSuccess}: ${txHash.slice(0, 10)}...`);
     } catch (e: unknown) {
@@ -400,9 +353,12 @@ function FeatureDetailPanel({
 
   const copyClaimLink = async () => {
     if (!createdPacketId) return;
-    await navigator.clipboard.writeText(
-      `${window.location.origin}/claim/${createdPacketId}`,
-    );
+    const reference = createdShareCode ?? createdPacketId;
+    await navigator.clipboard.writeText(formatShareText({
+      url: `${window.location.origin}/claim/${reference}`,
+      passcode: password,
+      locale,
+    }));
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 1500);
     toast.success(errors.copyLinkSuccess);
@@ -418,10 +374,6 @@ function FeatureDetailPanel({
       toast.error(errors.enterPacketId);
       return;
     }
-    if (isEvm && !isBytes32Hex(id)) {
-      toast.error(errors.invalidPacketId);
-      return;
-    }
     if (!claimPassword.trim()) {
       toast.error(errors.enterPasscode);
       return;
@@ -430,7 +382,13 @@ function FeatureDetailPanel({
     try {
       let amount: string | undefined;
       const txHash = await runClaimTx(async () => {
-        const res = await adapter.claimPacket({ id, password: claimPassword });
+        const res = isEvm
+          ? await claimPacketReference({
+              reference: id,
+              password: claimPassword,
+              adapter,
+            })
+          : await adapter.claimPacket({ id, password: claimPassword });
         amount = res.claimAmount;
         return { hash: res.hash, receipt: res.receipt };
       });
@@ -442,17 +400,9 @@ function FeatureDetailPanel({
     }
   };
 
-  const refreshMyPackets = () => setMyPackets(readMyPackets());
-
-  const copyStoredClaimLink = async (id: string) => {
-    await navigator.clipboard.writeText(`${window.location.origin}/claim/${id}`);
+  const copyStoredClaimLink = async (reference: string) => {
+    await navigator.clipboard.writeText(`${window.location.origin}/claim/${reference}`);
     toast.success(errors.copyLinkSuccess);
-  };
-
-  const removeStoredPacket = (id: string) => {
-    const next = myPackets.filter((packet) => packet.id !== id);
-    setMyPackets(next);
-    writeMyPackets(next);
   };
 
   const goPacketDetail = (id = packetIdQuery.trim()) => {
@@ -613,7 +563,7 @@ function FeatureDetailPanel({
                   </p>
                   <div className="flex items-center gap-2 rounded-md bg-white/80 px-3 py-2">
                     <span className="truncate font-mono text-xs text-emerald-950">
-                      {createdPacketId}
+                      {shortenId(createdPacketId, 10)}
                     </span>
                     <button
                       type="button"
@@ -631,7 +581,7 @@ function FeatureDetailPanel({
                       className="inline-flex items-center gap-2 rounded-md bg-white/80 px-3 py-2 text-sm font-bold text-emerald-700"
                     >
                       {copiedLink ? <Check className="h-4 w-4" /> : <Share2 className="h-4 w-4" />}
-                      {common.copyClaimLink}
+                      {common.copyShareLink}
                     </button>
                     <button
                       type="button"
@@ -719,7 +669,9 @@ function FeatureDetailPanel({
               { label: panels.mine.records, value: myPackets.length },
               {
                 label: panels.mine.recent,
-                value: myPackets[0] ? shortenId(myPackets[0].id, 6) : "-",
+                value: myPackets[0]
+                  ? myPackets[0].shareCode ?? shortenId(myPackets[0].packetId, 6)
+                  : "-",
               },
               { label: panels.mine.source, value: "Injective" },
             ]}
@@ -770,43 +722,35 @@ function FeatureDetailPanel({
             ) : (
               myPackets.slice(0, 3).map((item) => (
                 <div
-                  key={item.id}
+                  key={item.packetId}
                   className="rounded-lg border border-amber-900/10 bg-white/70 p-4"
                 >
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <p className="font-mono text-sm font-bold text-amber-950">
-                        {shortenId(item.id, 12)}
+                        {item.shareCode ?? shortenId(item.packetId, 12)}
                       </p>
                       <p className="mt-1 text-xs font-semibold text-amber-900/60">
-                        {item.amountInj ? `${item.amountInj} INJ` : ""}
-                        {item.count ? ` · ${item.count} ${common.unitShares}` : ""}
-                        {item.mode ? ` · ${item.mode === "random" ? form.random : form.equal}` : ""}
+                        {item.createdBlockTimestamp
+                          ? new Date(item.createdBlockTimestamp).toLocaleString()
+                          : ""}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => copyStoredClaimLink(item.id)}
+                        onClick={() => copyStoredClaimLink(item.shareCode ?? item.packetId)}
                         className="rounded-md bg-white px-3 py-2 text-xs font-bold text-amber-950"
-                        title={common.copyClaimLink}
+                        title={common.copyShareLink}
                       >
                         <Copy className="h-4 w-4" />
                       </button>
                       <button
                         type="button"
-                        onClick={() => router.push(`/packet/${item.id}`)}
+                        onClick={() => router.push(`/packet/${item.packetId}`)}
                         className="rounded-md bg-amber-950 px-3 py-2 text-xs font-bold text-white"
                       >
                         {common.view}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => removeStoredPacket(item.id)}
-                        className="rounded-md bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700"
-                        title={common.removeRecord}
-                      >
-                        <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
                   </div>

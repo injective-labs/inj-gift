@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createPostGiftPacket } from "./route";
+import { createGetGiftPackets, createPostGiftPacket } from "./route";
 
 const packetId = `0x${"11".repeat(32)}`;
 const txHash = `0x${"22".repeat(32)}`;
@@ -35,5 +35,32 @@ describe("POST /api/gift/packets", () => {
       body: JSON.stringify({ packetId, txHash, creator: packet.creatorAddress }),
     }));
     expect(response.status).toBe(400);
+  });
+});
+
+describe("GET /api/gift/packets", () => {
+  it("lists packets for a normalized creator", async () => {
+    const list = vi.fn().mockResolvedValue([packet]);
+    const handler = createGetGiftPackets({ list });
+    const response = await handler(
+      new Request(
+        `http://localhost/api/gift/packets?creator=${packet.creatorAddress.toUpperCase()}`,
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(list).toHaveBeenCalledWith(packet.creatorAddress);
+    await expect(response.json()).resolves.toEqual({ packets: [packet] });
+  });
+
+  it("rejects an invalid creator", async () => {
+    const list = vi.fn();
+    const handler = createGetGiftPackets({ list });
+    const response = await handler(
+      new Request("http://localhost/api/gift/packets?creator=invalid"),
+    );
+
+    expect(response.status).toBe(400);
+    expect(list).not.toHaveBeenCalled();
   });
 });

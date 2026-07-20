@@ -11,14 +11,17 @@ type TxLike = { hash: string; wait?: () => Promise<{ logs?: Array<unknown> }> };
 export class InjGiftContractWrapper {
   private contract: Contract;
 
-  constructor(private signerOrProvider: Signer | Provider) {
-    if (!injGiftAddress) {
+  constructor(
+    private signerOrProvider: Signer | Provider,
+    contractAddress: string | undefined = injGiftAddress,
+  ) {
+    if (!contractAddress) {
       throw appError(
         "INVALID_INPUT",
         "EVM contract address not configured. Set NEXT_PUBLIC_EVM_CONTRACT_ADDRESS",
       );
     }
-    this.contract = new Contract(injGiftAddress, abi, signerOrProvider);
+    this.contract = new Contract(contractAddress, abi, signerOrProvider);
   }
 
   async getPacket(id: string): Promise<GiftPacket> {

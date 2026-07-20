@@ -1,8 +1,9 @@
 import { ethers } from "ethers";
+import { syncCreatedPacket } from "@/client/gift/packetSync";
 import type { GiftAdapter } from "@/domain/giftAdapter";
+import { claimPacketReference } from "@/features/claim/gaslessClaim";
+import { resolvePacketReference } from "@/features/my-packets/client";
 import type { InjPassHostSession } from "@/wallet/injpass/hostProvider";
-
-const PACKET_ID = /^0x[a-fA-F0-9]{64}$/;
 
 export interface InjGiftAgentCommand {
   appId: string;
@@ -13,7 +14,7 @@ export interface InjGiftAgentCommand {
     password?: string;
     durationSec?: number;
     mode?: "random" | "equal";
-    packetId?: string;
+    packetReference?: string;
   };
 }
 
@@ -27,6 +28,10 @@ export interface InjGiftAgentResult {
 interface AgentDependencies {
   adapter: GiftAdapter;
   session: InjPassHostSession | null;
+  resolveReference?: typeof resolvePacketReference;
+  claimReference?: typeof claimPacketReference;
+  syncCreated?: typeof syncCreatedPacket;
+  shareOrigin?: string;
 }
 
 function transactionSession(session: InjPassHostSession | null): boolean {
@@ -42,9 +47,19 @@ export async function executeInjGiftAgentCommand(
 
   try {
     if (command.action === "query") {
-      if (!params.packetId || !PACKET_ID.test(params.packetId)) return { ok: false, key: "missing_packet_id" };
-      const packet = await dependencies.adapter.getPacket(params.packetId);
-      return { ok: true, key: "inj_gift_packet", data: { packet } };
+      if (!params.packetReference) return { ok: false, key: "missing_packet_id" };
+      const resolved = await (dependencies.resolveReference ?? resolvePacketReference)(
+        params.packetReference,
+      );
+      const packet = await dependencies.adapter.getPacket(
+        resolved.packetId,
+        resolved.contractAddress,
+      );
+      return {
+        ok: true,
+        key: "inj_gift_packet",
+        data: { packet, packetId: resolved.packetId, shareCode: resolved.shareCode },
+      };
     }
 
     if (command.action === "create") {
@@ -62,12 +77,25 @@ export async function executeInjGiftAgentCommand(
         durationSec: Math.max(60, Math.trunc(params.durationSec || 86_400)),
         mode: params.mode === "equal" ? "equal" : "random",
       });
+      const synced = result.packetId
+        ? await (dependencies.syncCreated ?? syncCreatedPacket)({
+            packetId: result.packetId,
+            txHash: result.hash,
+          })
+        : null;
+      const shareReference = synced?.shareCode ?? result.packetId;
+      const shareOrigin = dependencies.shareOrigin
+        ?? (typeof window === "undefined" ? "" : window.location.origin);
       return {
         ok: true,
         key: "inj_gift_created",
         data: {
           transactionHash: result.hash,
           packetId: result.packetId,
+          shareCode: synced?.shareCode,
+          shareUrl: shareReference
+            ? `${shareOrigin}/claim/${shareReference}`
+            : undefined,
           password: params.password.trim(),
           amount,
           count,
@@ -78,16 +106,19 @@ export async function executeInjGiftAgentCommand(
 
     if (command.action === "claim") {
       if (!transactionSession(dependencies.session)) return { ok: false, key: "login_required" };
-      if (!params.packetId || !PACKET_ID.test(params.packetId)) return { ok: false, key: "missing_packet_id" };
+      if (!params.packetReference) return { ok: false, key: "missing_packet_id" };
       if (!params.password?.trim()) return { ok: false, key: "missing_password" };
-      await dependencies.adapter.connect();
-      const result = await dependencies.adapter.claimPacket({ id: params.packetId, password: params.password.trim() });
+      const result = await (dependencies.claimReference ?? claimPacketReference)({
+        reference: params.packetReference,
+        password: params.password.trim(),
+        adapter: dependencies.adapter,
+      });
       return {
         ok: true,
         key: "inj_gift_claimed",
         data: {
           transactionHash: result.hash,
-          packetId: params.packetId,
+          packetId: result.packetId,
           claimedAmount: result.claimAmount,
         },
       };
@@ -111,6 +142,8 @@ interface MessageHandlerDependencies {
   adapter: GiftAdapter;
   getSession: () => InjPassHostSession | null;
   post: (payload: Record<string, unknown>) => void;
+  resolveReference?: typeof resolvePacketReference;
+  claimReference?: typeof claimPacketReference;
 }
 
 export function createInjGiftAgentMessageHandler(dependencies: MessageHandlerDependencies) {
@@ -128,6 +161,8 @@ export function createInjGiftAgentMessageHandler(dependencies: MessageHandlerDep
     const result = await executeInjGiftAgentCommand(command, {
       adapter: dependencies.adapter,
       session: dependencies.getSession(),
+      resolveReference: dependencies.resolveReference,
+      claimReference: dependencies.claimReference,
     });
     dependencies.post({
       channel: "injpass-miniapp-v1",

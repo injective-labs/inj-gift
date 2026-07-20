@@ -10,10 +10,11 @@ import { Modal } from "../../components/Modal";
 import { shortenId } from "../../lib/utils";
 import { ArrowLeft, Gift, Loader2, Sparkles, Clock, Coins, Key, Zap, Copy, Check, Share2 } from "lucide-react";
 import { useI18n, errorMessage } from "@/i18n";
-import { syncCreatedPacket } from "@/client/gift/packetSync";
+import { useMyPackets } from "@/features/my-packets/useMyPackets";
+import { formatShareText } from "@/features/share/shareText";
 
 export default function CreatePage() {
-  const { t: dict } = useI18n();
+  const { t: dict, locale } = useI18n();
   const { create: tc, form, common, errors } = dict;
   const { adapter } = useGiftAdapter();
   const { run: runTx, state: txState } = useTx();
@@ -31,34 +32,12 @@ export default function CreatePage() {
   const [mode, setMode] = useState<"random" | "equal">("random");
   const [successOpen, setSuccessOpen] = useState(false);
   const [createdPacketId, setCreatedPacketId] = useState<string | null>(null);
+  const [createdShareCode, setCreatedShareCode] = useState<string | null>(null);
   const [createdTxHash, setCreatedTxHash] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
 
-  const saveMyPacket = (id: string, txHash: string | null) => {
-    if (typeof window === "undefined") return;
-    try {
-      const key = "injgift.myPackets";
-      const raw = window.localStorage.getItem(key);
-      const list = raw ? (JSON.parse(raw) as Array<Record<string, unknown>>) : [];
-      const exists = list.some((item) => item.id === id);
-      if (!exists) {
-        list.unshift({
-          id,
-          createdAt: Date.now(),
-          amountInj,
-          count,
-          mode,
-          expiresAt,
-          token: denomOrCw20.trim(),
-          txHash,
-        });
-        window.localStorage.setItem(key, JSON.stringify(list));
-      }
-    } catch {
-      // Ignore localStorage errors
-    }
-  };
+  const { recordCreatedPacket } = useMyPackets();
 
   const toBaseUnits = (value: string) => {
     const trimmed = value.trim();
@@ -127,8 +106,8 @@ export default function CreatePage() {
         setCreatedPacketId(packetId ?? null);
         if (packetId) {
           const createTxHash = txHashValue ?? txHash;
-          saveMyPacket(packetId, createTxHash);
-          await syncCreatedPacket({ packetId, txHash: createTxHash });
+          const synced = await recordCreatedPacket({ packetId, txHash: createTxHash });
+          setCreatedShareCode(synced?.shareCode ?? null);
         }
         setSuccessOpen(true);
         toast.success(`${errors.createSuccess}: ${txHash.slice(0, 10)}...`);
@@ -147,8 +126,13 @@ export default function CreatePage() {
 
   const copyClaimLink = async () => {
     if (!createdPacketId) return;
-    const link = `${window.location.origin}/claim/${createdPacketId}`;
-    await navigator.clipboard.writeText(link);
+    const reference = createdShareCode ?? createdPacketId;
+    const link = `${window.location.origin}/claim/${reference}`;
+    await navigator.clipboard.writeText(formatShareText({
+      url: link,
+      passcode: password,
+      locale,
+    }));
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 1500);
   };
@@ -353,7 +337,7 @@ export default function CreatePage() {
               <div className="text-xs font-semibold text-emerald-700">{form.packetId}</div>
               <div className="mt-2 flex items-center gap-2 rounded-xl bg-white/80 px-3 py-2">
                 <span className="text-xs font-mono text-emerald-900/80 truncate">
-                  {createdPacketId}
+                  {shortenId(createdPacketId, 10)}
                 </span>
                 <button
                   type="button"
@@ -366,7 +350,7 @@ export default function CreatePage() {
               </div>
               <div className="mt-3 flex items-center gap-2 rounded-xl bg-white/80 px-3 py-2">
                 <span className="text-xs font-mono text-emerald-900/80 truncate">
-                  {`/claim/${createdPacketId}`}
+                  {`/claim/${createdShareCode ?? shortenId(createdPacketId, 6)}`}
                 </span>
                 <button
                   type="button"
@@ -374,7 +358,7 @@ export default function CreatePage() {
                   className="ml-auto inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:text-emerald-900"
                 >
                   {copiedLink ? <Check className="w-3 h-3" /> : <Share2 className="w-3 h-3" />}
-                  {copiedLink ? common.copied : common.copyLink}
+                  {copiedLink ? common.copied : common.copyShareLink}
                 </button>
               </div>
               <div className="mt-2 text-xs text-emerald-700">
@@ -420,6 +404,5 @@ export default function CreatePage() {
     </div>
   );
 }
-
 
 

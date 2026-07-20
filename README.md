@@ -18,6 +18,22 @@ Next.js frontend for the InjGift red-packet contract on Injective inEVM.
 
 Set these in `.env.local` for local dev, or in Vercel for deployment:
 
+Gasless claims are handled by this app's same-origin
+`POST /api/gift/claims/relay` route. Configure the server-only
+`INJ_GIFT_RELAYER_PRIVATE_KEY`, `INJ_GIFT_CONTRACT_ADDRESSES`, and
+`INJ_GIFT_RELAYER_MAX_GAS` variables in the INJ Gift deployment.
+
+For the short-share and gasless-claim release, deploy in this order:
+
+1. Deploy the updated `InjGift` contract and keep the legacy address available.
+2. Configure the INJ Gift Relayer allowlist with the new gasless-capable contract address.
+3. Run `npm run db:migrate:gift` to add unique eight-character share codes.
+4. Update the Gift app contract/API environment variables and deploy the app.
+
+The on-chain packet ID remains `bytes32`; `/claim/{shareCode}` is resolved by
+the Gift API before querying or claiming. Do not remove the legacy contract
+until every existing full-ID link has expired or been refunded.
+
 ```
 NEXT_PUBLIC_STACK_MODE=evm
 NEXT_PUBLIC_NETWORK=testnet

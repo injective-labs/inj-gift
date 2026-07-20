@@ -39,18 +39,36 @@ const session = {
 describe("executeInjGiftAgentCommand", () => {
   it("creates a native INJ packet through the shared adapter", async () => {
     const gift = adapter();
+    const syncCreated = vi.fn().mockResolvedValue({ shareCode: "4ERuUi6m" });
     const result = await executeInjGiftAgentCommand({
       appId: "inj-gift",
       action: "create",
       params: { amount: "0.01", count: 2, password: "lucky", durationSec: 3600, mode: "random" },
-    }, { adapter: gift, session });
+    }, {
+      adapter: gift,
+      session,
+      syncCreated,
+      shareOrigin: "https://gift.example",
+    });
 
     expect(gift.createPacket).toHaveBeenCalledWith(expect.objectContaining({
       amount: "10000000000000000",
       count: 2,
       password: "lucky",
     }));
-    expect(result).toMatchObject({ ok: true, key: "inj_gift_created", data: { transactionHash: "0xcreate" } });
+    expect(syncCreated).toHaveBeenCalledWith({
+      packetId: `0x${"ab".repeat(32)}`,
+      txHash: "0xcreate",
+    });
+    expect(result).toMatchObject({
+      ok: true,
+      key: "inj_gift_created",
+      data: {
+        transactionHash: "0xcreate",
+        shareCode: "4ERuUi6m",
+        shareUrl: "https://gift.example/claim/4ERuUi6m",
+      },
+    });
   });
 
   it("claims a packet and returns the claimed amount", async () => {
@@ -59,21 +77,36 @@ describe("executeInjGiftAgentCommand", () => {
     const result = await executeInjGiftAgentCommand({
       appId: "inj-gift",
       action: "claim",
-      params: { packetId, password: "lucky" },
-    }, { adapter: gift, session });
+      params: { packetReference: "4ERuUi6m", password: "lucky" },
+    }, {
+      adapter: gift,
+      session,
+      claimReference: vi.fn().mockResolvedValue({
+        hash: "0xgasless",
+        packetId,
+      }),
+    });
 
-    expect(gift.claimPacket).toHaveBeenCalledWith({ id: packetId, password: "lucky" });
-    expect(result).toMatchObject({ ok: true, key: "inj_gift_claimed", data: { transactionHash: "0xclaim" } });
+    expect(gift.claimPacket).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      ok: true,
+      key: "inj_gift_claimed",
+      data: { transactionHash: "0xgasless", packetId },
+    });
   });
 
-  it("queries packet state without an authenticated session", async () => {
+  it("resolves a short link before querying packet state", async () => {
     const gift = adapter();
+    const packetId = `0x${"ab".repeat(32)}`;
+    const resolveReference = vi.fn().mockResolvedValue({ packetId });
     const result = await executeInjGiftAgentCommand({
       appId: "inj-gift",
       action: "query",
-      params: { packetId: `0x${"ab".repeat(32)}` },
-    }, { adapter: gift, session: null });
+      params: { packetReference: "https://gift.example/claim/4ERuUi6m" },
+    }, { adapter: gift, session: null, resolveReference });
 
+    expect(resolveReference).toHaveBeenCalledWith("https://gift.example/claim/4ERuUi6m");
+    expect(gift.getPacket).toHaveBeenCalledWith(packetId, undefined);
     expect(gift.connect).not.toHaveBeenCalled();
     expect(result).toMatchObject({ ok: true, key: "inj_gift_packet" });
   });
@@ -98,6 +131,11 @@ describe("executeInjGiftAgentCommand", () => {
       adapter: gift,
       getSession: () => session,
       post,
+      claimReference: vi.fn().mockResolvedValue({
+        hash: "0xclaim",
+        packetId: `0x${"ab".repeat(32)}`,
+        claimAmount: "1000000000000000",
+      }),
     });
     const command = {
       channel: "injpass-miniapp-v1",
@@ -106,7 +144,7 @@ describe("executeInjGiftAgentCommand", () => {
       command: {
         appId: "inj-gift",
         action: "claim",
-        params: { packetId: `0x${"ab".repeat(32)}`, password: "lucky" },
+        params: { packetReference: `0x${"ab".repeat(32)}`, password: "lucky" },
       },
     };
 

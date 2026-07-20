@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { listGiftPackets, upsertGiftPacket } from "./packetRepository";
+import {
+  getGiftPacketByShareCode,
+  listGiftPackets,
+  upsertGiftPacket,
+} from "./packetRepository";
 
 const record = {
   packetId: `0x${"11".repeat(32)}`,
@@ -15,11 +19,11 @@ describe("gift packet repository", () => {
   it("upserts the normalized chain identity", async () => {
     const query = vi.fn().mockResolvedValue({ rows: [record] });
 
-    await upsertGiftPacket({ query }, record);
+    await upsertGiftPacket({ query }, record, () => "3kP9xQ7m");
 
     expect(query).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO "gift-packets"'),
-      expect.arrayContaining([record.packetId, record.creatorAddress]),
+      expect.arrayContaining([record.packetId, record.creatorAddress, "3kP9xQ7m"]),
     );
   });
 
@@ -31,6 +35,17 @@ describe("gift packet repository", () => {
     expect(query).toHaveBeenCalledWith(
       expect.stringContaining("ORDER BY created_block_timestamp DESC"),
       [record.creatorAddress],
+    );
+  });
+
+  it("resolves one case-sensitive share code", async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [] });
+
+    await getGiftPacketByShareCode({ query }, "3kP9xQ7m");
+
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining("WHERE share_code = $1"),
+      ["3kP9xQ7m"],
     );
   });
 });

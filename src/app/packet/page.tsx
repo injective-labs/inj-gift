@@ -1,71 +1,24 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { WalletButton } from "../../components/WalletButton";
-import { ArrowLeft, Search, Copy, Trash2 } from "lucide-react";
+import { ArrowLeft, Search, Copy } from "lucide-react";
 import { toast } from "sonner";
 import { shortenId } from "../../lib/utils";
 import { useI18n } from "@/i18n";
-
-type MyPacket = {
-  id: string;
-  createdAt: number;
-  amountInj?: string;
-  count?: number;
-  mode?: string;
-  durationDays?: number;
-  token?: string;
-  txHash?: string | null;
-};
-
-const readMyPackets = (): MyPacket[] => {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem("injgift.myPackets");
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as MyPacket[];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-};
-
-const writeMyPackets = (list: MyPacket[]) => {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem("injgift.myPackets", JSON.stringify(list));
-  } catch {
-    return;
-  }
-};
+import { useMyPackets } from "@/features/my-packets/useMyPackets";
 
 export default function PacketIndexPage() {
   const { t } = useI18n();
   const { packetIndex: tp, form, common, errors } = t;
   const router = useRouter();
   const [packetId, setPacketId] = useState("");
-  const [myPackets, setMyPackets] = useState<MyPacket[]>([]);
-
-  useEffect(() => {
-    setMyPackets(readMyPackets());
-  }, []);
-
-  const refreshMyPackets = () => setMyPackets(readMyPackets());
-
-  const removePacket = (id: string) => {
-    const next = myPackets.filter((p) => p.id !== id);
-    setMyPackets(next);
-    writeMyPackets(next);
-  };
-
-  const clearAll = () => {
-    setMyPackets([]);
-    writeMyPackets([]);
-  };
+  const { packets: myPackets, refresh: refreshMyPackets } = useMyPackets();
 
   const copyClaimLink = async (id: string) => {
-    const link = `${window.location.origin}/claim/${id}`;
+    const item = myPackets.find((packet) => packet.packetId === id);
+    const link = `${window.location.origin}/claim/${item?.shareCode ?? id}`;
     await navigator.clipboard.writeText(link);
     toast.success(errors.copyShareSuccess);
   };
@@ -125,36 +78,27 @@ export default function PacketIndexPage() {
                     >
                       {common.refresh}
                     </button>
-                    <button
-                      type="button"
-                      onClick={clearAll}
-                      className="text-xs font-semibold text-red-600 hover:text-red-700"
-                    >
-                      {common.clear}
-                    </button>
                   </div>
                 </div>
                 <div className="space-y-3">
                   {myPackets.map((item) => (
                     <div
-                      key={item.id}
+                      key={item.packetId}
                       className="rounded-2xl border border-gray-100 bg-white/95 p-4 shadow-sm"
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div>
                           <div className="text-sm font-mono text-gray-800">
-                            {shortenId(item.id, 12)}
+                            {item.shareCode ?? shortenId(item.packetId, 12)}
                           </div>
                           <div className="text-xs text-gray-500 mt-1">
-                            {item.amountInj ? `${item.amountInj} INJ` : ""}
-                            {item.count ? ` · ${item.count} ${common.unitCount}` : ""}
-                            {item.mode ? ` · ${item.mode === "random" ? form.random : form.equal}` : ""}
+                            {new Date(item.createdBlockTimestamp ?? "").toLocaleString()}
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
                           <button
                             type="button"
-                            onClick={() => copyClaimLink(item.id)}
+                            onClick={() => copyClaimLink(item.packetId)}
                             className="p-2 rounded-xl hover:bg-gray-100"
                             title={common.copyShareLink}
                           >
@@ -162,18 +106,10 @@ export default function PacketIndexPage() {
                           </button>
                           <button
                             type="button"
-                            onClick={() => router.push(`/packet/${item.id}`)}
+                            onClick={() => router.push(`/packet/${item.packetId}`)}
                             className="px-3 py-2 rounded-xl bg-yellow-600 text-white text-xs font-semibold hover:bg-yellow-700"
                           >
                             {common.view}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => removePacket(item.id)}
-                            className="p-2 rounded-xl hover:bg-red-50"
-                            title={common.remove}
-                          >
-                            <Trash2 className="w-4 h-4 text-red-600" />
                           </button>
                         </div>
                       </div>

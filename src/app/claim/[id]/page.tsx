@@ -10,13 +10,15 @@ import { ethers } from "ethers";
 import { ArrowLeft, Gift, Key, Loader2, Sparkles, Check, Copy } from "lucide-react";
 import { useGiftAdapter } from "../../../hooks/useGiftAdapter";
 import { useTx } from "../../../hooks/useTx";
-import { isBytes32Hex } from "../../../lib/utils";
 import { normalizeError } from "../../../domain/normalizeError";
 import type { GiftPacket } from "../../../domain/types";
 import { useI18n, errorMessage } from "@/i18n";
+import { claimPacketReference } from "@/features/claim/gaslessClaim";
+import { resolvePacketReference } from "@/features/my-packets/client";
+import { formatShareText } from "@/features/share/shareText";
 
 export default function ClaimPage() {
-  const { t: dict } = useI18n();
+  const { t: dict, locale } = useI18n();
   const { claimDetail: tc, common, errors, status } = dict;
   const params = useParams<{ id: string }>();
   const packetId = params.id;
@@ -34,17 +36,9 @@ export default function ClaimPage() {
   const [claimAmount, setClaimAmount] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
   const [packet, setPacket] = useState<GiftPacket | null>(null);
+  const [resolvedPacketId, setResolvedPacketId] = useState<string | null>(null);
   const [statusLoading, setStatusLoading] = useState(false);
   const [statusError, setStatusError] = useState<string | null>(null);
-
-  const idError = useMemo(() => {
-    if (!isEvm) return null;
-    if (isDemo) return null;
-    if (!isBytes32Hex(packetId)) {
-      return errors.invalidPacketId;
-    }
-    return null;
-  }, [isEvm, isDemo, packetId, errors.invalidPacketId]);
 
   useEffect(() => {
     if (isDemo) {
@@ -64,21 +58,22 @@ export default function ClaimPage() {
       return;
     }
 
-    if (idError) {
-      setPacket(null);
-      setStatusError(idError);
-      return;
-    }
-
     let mounted = true;
     const load = async () => {
       try {
         setStatusLoading(true);
-        const res = await adapter.getPacket(packetId);
+        const resolved = isEvm
+          ? await resolvePacketReference(packetId)
+          : { packetId };
+        const res = await adapter.getPacket(
+          resolved.packetId,
+          "contractAddress" in resolved ? resolved.contractAddress : undefined,
+        );
         if (!mounted) return;
+        setResolvedPacketId(resolved.packetId);
         setPacket(res);
         setStatusError(null);
-      } catch (e: any) {
+      } catch (e: unknown) {
         if (!mounted) return;
         setPacket(null);
         setStatusError(errorMessage(e, dict) || errors.loadFailed);
@@ -91,7 +86,7 @@ export default function ClaimPage() {
     return () => {
       mounted = false;
     };
-  }, [adapter, idError, isDemo, packetId]);
+  }, [adapter, dict, errors.loadFailed, isDemo, isEvm, packetId]);
 
   const summary = useMemo(() => {
     if (!packet) return null;
@@ -107,10 +102,6 @@ export default function ClaimPage() {
       toast.error(errors.enterPasscode);
       return;
     }
-    if (idError) {
-      toast.error(idError);
-      return;
-    }
     if (isDemo) {
       const demoAmounts = ["0.28", "0.36", "0.41", "0.52"];
       const pick = demoAmounts[Math.floor(Math.random() * demoAmounts.length)];
@@ -121,14 +112,20 @@ export default function ClaimPage() {
     try {
       let amount: string | undefined;
       await runTx(async () => {
-        const res = await adapter.claimPacket({ id: packetId, password });
+        const res = isEvm
+          ? await claimPacketReference({
+              reference: packetId,
+              password,
+              adapter,
+            })
+          : await adapter.claimPacket({ id: packetId, password });
         amount = res.claimAmount;
         return { hash: res.hash };
       });
       toast.success(`${errors.claimSuccess}🎉`);
       setClaimAmount(amount ?? null);
       setSuccessOpen(true);
-    } catch (e: any) {
+    } catch (e: unknown) {
       const err = normalizeError(e);
       toast.error(errorMessage(err, dict) || errors.claimFailed);
     }
@@ -136,7 +133,11 @@ export default function ClaimPage() {
 
   const copyClaimLink = async () => {
     const link = `${window.location.origin}/claim/${packetId}`;
-    await navigator.clipboard.writeText(link);
+    await navigator.clipboard.writeText(formatShareText({
+      url: link,
+      passcode: password,
+      locale,
+    }));
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 1500);
   };
@@ -155,7 +156,7 @@ export default function ClaimPage() {
     return `${packet.totalCount - packet.claimedCount} / ${packet.totalCount}`;
   };
 
-  const errorTitle = idError ? tc.errorTitleInvalidId : errors.loadFailed;
+  const errorTitle = errors.loadFailed;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-red-50 via-orange-50 to-yellow-50 relative overflow-hidden">
@@ -315,7 +316,7 @@ export default function ClaimPage() {
           <div className="rounded-2xl bg-emerald-50 p-4 border border-emerald-100">
             <div className="text-xs font-semibold text-emerald-700">{dict.form.packetId}</div>
             <div className="mt-2 text-sm font-mono text-emerald-900">
-              {shortenId(packetId, 12)}
+              {shortenId(resolvedPacketId ?? packetId, 12)}
             </div>
           </div>
 
@@ -344,7 +345,7 @@ export default function ClaimPage() {
                 className="ml-auto inline-flex items-center gap-1 text-xs font-semibold text-gray-700 hover:text-gray-900"
               >
                 {copiedLink ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                {copiedLink ? common.copied : common.copyLink}
+                {copiedLink ? common.copied : common.copyShareLink}
               </button>
             </div>
           </div>
@@ -352,7 +353,7 @@ export default function ClaimPage() {
           <div className="flex gap-2">
             <button
               type="button"
-              onClick={() => router.push(`/packet/${packetId}`)}
+              onClick={() => router.push(`/packet/${resolvedPacketId ?? packetId}`)}
               className="flex-1 rounded-xl bg-emerald-600 text-white font-semibold py-3 hover:bg-emerald-700 transition-colors"
             >
               {common.viewPacketDetail}
@@ -370,8 +371,4 @@ export default function ClaimPage() {
     </div>
   );
 }
-
-
-
-
 

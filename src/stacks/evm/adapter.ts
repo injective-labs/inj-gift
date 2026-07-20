@@ -41,7 +41,13 @@ export class EvmGiftAdapter implements GiftAdapter {
     return this.wallet.getState().address;
   }
 
-  async getPacket(id: string): Promise<GiftPacket> {
+  async getPacket(id: string, contractAddress?: string): Promise<GiftPacket> {
+    if (contractAddress) {
+      return new InjGiftContractWrapper(
+        new JsonRpcProvider(getEvmConfigOrThrow().rpcUrl),
+        contractAddress,
+      ).getPacket(id);
+    }
     if (this.contract) return this.contract.getPacket(id);
     if (!this.readContract) {
       this.readContract = new InjGiftContractWrapper(
@@ -57,15 +63,21 @@ export class EvmGiftAdapter implements GiftAdapter {
     return { hash, stack: "evm", packetId, receipt };
   }
 
-  async claimPacket(input: ClaimPacketInput): Promise<TxResult> {
+  async claimPacket(input: ClaimPacketInput, contractAddress?: string): Promise<TxResult> {
     await this.ensureConnected();
-    const { hash, claimAmount, receipt } = await this.contract!.claimPacket(input);
+    const contract = contractAddress
+      ? new InjGiftContractWrapper(this.wallet.getState().signer!, contractAddress)
+      : this.contract!;
+    const { hash, claimAmount, receipt } = await contract.claimPacket(input);
     return { hash, stack: "evm", claimAmount, receipt };
   }
 
-  async refundPacket(id: string): Promise<TxResult> {
+  async refundPacket(id: string, contractAddress?: string): Promise<TxResult> {
     await this.ensureConnected();
-    const { hash, receipt } = await this.contract!.refundPacket(id);
+    const contract = contractAddress
+      ? new InjGiftContractWrapper(this.wallet.getState().signer!, contractAddress)
+      : this.contract!;
+    const { hash, receipt } = await contract.refundPacket(id);
     return { hash, stack: "evm", receipt };
   }
 }

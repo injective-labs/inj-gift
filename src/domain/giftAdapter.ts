@@ -13,9 +13,8 @@ export interface GiftAdapter {
   disconnect(): Promise<void>;
   getAddress(): Promise<string | null>;
 
-  getPacket(id: string): Promise<GiftPacket>;
+  getPacket(id: string, contractAddress?: string): Promise<GiftPacket>;
   createPacket(input: CreatePacketInput): Promise<TxResult>;
-  claimPacket(input: ClaimPacketInput): Promise<TxResult>;
-  refundPacket(id: string): Promise<TxResult>;
+  claimPacket(input: ClaimPacketInput, contractAddress?: string): Promise<TxResult>;
+  refundPacket(id: string, contractAddress?: string): Promise<TxResult>;
 }
-

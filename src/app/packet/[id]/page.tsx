@@ -5,7 +5,6 @@ import Link from "next/link";
 import { WalletButton } from "../../../components/WalletButton";
 import { useGiftAdapter } from "../../../hooks/useGiftAdapter";
 import { getInjpassEip1193 } from "@/wallet/injpass/provider";
-import { isBytes32Hex } from "../../../lib/utils";
 import type { GiftPacket } from "../../../domain/types";
 import { ethers } from "ethers";
 import { 
@@ -20,6 +19,7 @@ import {
   packetLoadingMode,
   type PacketFetchSource,
 } from "@/features/redpacket/domain/loadingState";
+import { resolvePacketReference } from "@/features/my-packets/client";
 
 export default function PacketDetailPage() {
   const { t: dict } = useI18n();
@@ -34,6 +34,7 @@ export default function PacketDetailPage() {
   const inFlightRef = useRef(false);
   const requestSequenceRef = useRef(0);
   const [address, setAddress] = useState<string | null>(null);
+  const [contractAddress, setContractAddress] = useState<string | undefined>();
 
   const { adapter } = useGiftAdapter();
   const isEvm = adapter.stack === "evm";
@@ -63,12 +64,6 @@ export default function PacketDetailPage() {
       return;
     }
 
-    if (isEvm && !isBytes32Hex(id)) {
-      setError({ message: errors.invalidPacketId });
-      setData(null);
-      return;
-    }
-
     const requestSequence = ++requestSequenceRef.current;
     const loadingMode = packetLoadingMode(dataRef.current !== null, source);
     inFlightRef.current = true;
@@ -76,8 +71,18 @@ export default function PacketDetailPage() {
     setIsRefreshing(loadingMode.refreshing);
 
     try {
-      const packet = await adapter.getPacket(id);
+      const resolved = isEvm
+        ? await resolvePacketReference(id)
+        : { packetId: id };
+      const resolvedContract = "contractAddress" in resolved
+        ? resolved.contractAddress
+        : undefined;
+      const packet = await adapter.getPacket(
+        resolved.packetId,
+        resolvedContract,
+      );
       if (requestSequence !== requestSequenceRef.current) return;
+      setContractAddress(resolvedContract);
       dataRef.current = packet;
       setData(packet);
       setError(null);
@@ -92,7 +97,7 @@ export default function PacketDetailPage() {
         setIsRefreshing(false);
       }
     }
-  }, [id, adapter, isDemo, isEvm, dict, errors.invalidPacketId]);
+  }, [id, adapter, isDemo, isEvm, dict]);
 
   useEffect(() => {
     void fetchPacket("initial");
@@ -207,7 +212,7 @@ export default function PacketDetailPage() {
     if (!data) return;
     try {
       await runRefundTx(async () => {
-        const res = await adapter.refundPacket(data.id);
+        const res = await adapter.refundPacket(data.id, contractAddress);
         return { hash: res.hash };
       });
       toast.success(errors.refundInitiated);
