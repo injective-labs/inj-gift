@@ -1,4 +1,4 @@
-import { BrowserProvider, Contract, keccak256, toUtf8Bytes } from "ethers";
+import { BrowserProvider, Contract, Interface, keccak256, toUtf8Bytes } from "ethers";
 import type { Eip1193Provider } from "@injpass/cli";
 import type { GiftAdapter } from "@/domain/giftAdapter";
 import { resolvePacketReference } from "@/features/my-packets/client";
@@ -8,6 +8,11 @@ import { connectInjpass } from "@/wallet/injpass/provider";
 type ConnectedWallet = {
   address: string;
   provider: Eip1193Provider;
+};
+
+export type ClaimReceipt = {
+  status?: number | string | null;
+  logs?: Array<{ address?: string; data?: string; topics?: ReadonlyArray<string> }>;
 };
 
 type Dependencies = {
@@ -20,6 +25,63 @@ type Dependencies = {
   fetcher: typeof fetch;
   now: () => number;
   relayerUrl: string;
+  /**
+   * Optional receipt waiter. When provided, the claim resolves only after the
+   * relayed tx is mined, letting us surface the real claimed amount and catch
+   * on-chain reverts. When omitted, the call returns as soon as the relayer
+   * accepts the tx (hash only).
+   */
+  waitForReceipt?: (
+    hash: string,
+    provider: Eip1193Provider,
+  ) => Promise<ClaimReceipt | null>;
+};
+
+const claimedEventInterface = new Interface([
+  "event RedPacketClaimed(bytes32 indexed id,address indexed claimer,uint256 amount)",
+]);
+
+function extractClaimAmount(receipt: ClaimReceipt | null): string | undefined {
+  if (!receipt?.logs?.length) return undefined;
+  for (const log of receipt.logs) {
+    try {
+      const parsed = claimedEventInterface.parseLog({
+        topics: [...(log.topics ?? [])],
+        data: log.data ?? "0x",
+      });
+      if (parsed?.name === "RedPacketClaimed") {
+        const amount = parsed.args?.amount ?? parsed.args?.[2];
+        if (amount != null) return amount.toString();
+      }
+    } catch {
+      continue;
+    }
+  }
+  return undefined;
+}
+
+function isReverted(receipt: ClaimReceipt | null): boolean {
+  if (!receipt || receipt.status == null) return false;
+  return receipt.status === 0 || receipt.status === "0x0";
+}
+
+/**
+ * Production receipt waiter: polls the connected wallet's RPC until the relayed
+ * claim tx is mined (or a timeout elapses). Timeouts degrade gracefully to
+ * `null` so a slow RPC doesn't turn an accepted claim into a fake failure.
+ */
+export const waitForClaimReceipt = async (
+  hash: string,
+  provider: Eip1193Provider,
+): Promise<ClaimReceipt | null> => {
+  try {
+    const browserProvider = new BrowserProvider(provider);
+    return (await browserProvider.waitForTransaction(hash, 1, 60_000)) as
+      | ClaimReceipt
+      | null;
+  } catch {
+    return null;
+  }
 };
 
 const defaultReadNonce: Dependencies["readNonce"] = async (
@@ -69,13 +131,14 @@ export async function claimPacketGasless(
     chainId: number;
   },
   overrides: Partial<Dependencies> = {},
-): Promise<{ hash: string }> {
+): Promise<{ hash: string; receipt?: ClaimReceipt | null; claimAmount?: string }> {
   const dependencies: Dependencies = {
     connect: overrides.connect ?? connectInjpass,
     readNonce: overrides.readNonce ?? defaultReadNonce,
     fetcher: overrides.fetcher ?? defaultFetcher,
     now: overrides.now ?? Date.now,
     relayerUrl: overrides.relayerUrl ?? defaultRelayerUrl(),
+    waitForReceipt: overrides.waitForReceipt,
   };
   const { address, provider } = await dependencies.connect();
   const nonce = await dependencies.readNonce(
@@ -137,7 +200,17 @@ export async function claimPacketGasless(
     throw new Error(await relayErrorMessage(response));
   }
   const payload = (await response.json()) as { transactionHash: string };
-  return { hash: payload.transactionHash };
+  const hash = payload.transactionHash;
+
+  if (!dependencies.waitForReceipt) {
+    return { hash };
+  }
+
+  const receipt = await dependencies.waitForReceipt(hash, provider);
+  if (isReverted(receipt)) {
+    throw new Error("Claim transaction reverted on-chain");
+  }
+  return { hash, receipt, claimAmount: extractClaimAmount(receipt) };
 }
 
 type ClaimReferenceDependencies = {
@@ -151,6 +224,10 @@ export async function claimPacketReference(
     reference: string;
     password: string;
     adapter: GiftAdapter;
+    waitForReceipt?: (
+      hash: string,
+      provider: Eip1193Provider,
+    ) => Promise<ClaimReceipt | null>;
   },
   overrides: Partial<ClaimReferenceDependencies> = {},
 ): Promise<{
@@ -170,12 +247,22 @@ export async function claimPacketReference(
     && currentContractAddress
     && packet.contractAddress.toLowerCase() === currentContractAddress.toLowerCase()
   ) {
-    const result = await claimGasless({
-      packetId: packet.packetId,
-      password: input.password,
-      contractAddress: packet.contractAddress,
-      chainId: packet.chainId,
-    });
+    const result = input.waitForReceipt
+      ? await claimGasless(
+          {
+            packetId: packet.packetId,
+            password: input.password,
+            contractAddress: packet.contractAddress,
+            chainId: packet.chainId,
+          },
+          { waitForReceipt: input.waitForReceipt },
+        )
+      : await claimGasless({
+          packetId: packet.packetId,
+          password: input.password,
+          contractAddress: packet.contractAddress,
+          chainId: packet.chainId,
+        });
     return { ...result, packetId: packet.packetId };
   }
 

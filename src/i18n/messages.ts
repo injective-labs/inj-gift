@@ -224,6 +224,9 @@ const zh = {
     title: "我的红包",
     subtitle: "输入红包 ID 查看详情",
     queryTitle: "查询红包",
+    loading: "正在加载你的红包…",
+    loadError: "加载失败，请点击重试",
+    empty: "你还没有创建过红包",
   },
   packetDetail: {
     title: "红包详情",
@@ -520,6 +523,9 @@ const en: Dict = {
     title: "My Packets",
     subtitle: "Enter a packet ID to view details",
     queryTitle: "Look up a packet",
+    loading: "Loading your packets…",
+    loadError: "Failed to load. Tap to retry.",
+    empty: "You haven't created any packets yet",
   },
   packetDetail: {
     title: "Packet Details",
@@ -813,6 +819,9 @@ const ja: Dict = {
     title: "自分の紅包",
     subtitle: "紅包 ID を入力して詳細を表示",
     queryTitle: "紅包を照会",
+    loading: "紅包を読み込み中…",
+    loadError: "読み込みに失敗しました。タップして再試行",
+    empty: "まだ紅包を作成していません",
   },
   packetDetail: {
     title: "紅包の詳細",
@@ -1106,6 +1115,9 @@ const ko: Dict = {
     title: "내 레드 패킷",
     subtitle: "패킷 ID를 입력해 상세 보기",
     queryTitle: "패킷 조회",
+    loading: "레드 패킷을 불러오는 중…",
+    loadError: "불러오기에 실패했습니다. 눌러서 다시 시도",
+    empty: "아직 만든 레드 패킷이 없습니다",
   },
   packetDetail: {
     title: "레드 패킷 상세",

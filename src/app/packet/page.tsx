@@ -3,7 +3,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { WalletButton } from "../../components/WalletButton";
-import { ArrowLeft, Search, Copy } from "lucide-react";
+import { ArrowLeft, Search, Copy, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { shortenId } from "../../lib/utils";
 import { useI18n } from "@/i18n";
@@ -16,7 +16,7 @@ export default function PacketIndexPage() {
   const { packetIndex: tp, form, common, errors } = t;
   const router = useRouter();
   const [packetId, setPacketId] = useState("");
-  const { packets: myPackets, refresh: refreshMyPackets } = useMyPackets();
+  const { packets: myPackets, refresh: refreshMyPackets, status: myStatus } = useMyPackets();
 
   const copyClaimLink = async (id: string) => {
     const item = myPackets.find((packet) => packet.packetId === id);
@@ -72,7 +72,7 @@ export default function PacketIndexPage() {
               </div>
             </div>
 
-            {myPackets.length > 0 && (
+            {myStatus !== "idle" && (
               <div className="mb-8 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="text-sm font-semibold text-gray-700">{common.myCreatedPackets}</div>
@@ -86,6 +86,31 @@ export default function PacketIndexPage() {
                     </button>
                   </div>
                 </div>
+
+                {myStatus === "loading" && (
+                  <div className="flex items-center justify-center gap-2 rounded-2xl border border-gray-100 bg-white/95 py-8 text-sm text-gray-500">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    {tp.loading}
+                  </div>
+                )}
+
+                {myStatus === "error" && (
+                  <button
+                    type="button"
+                    onClick={refreshMyPackets}
+                    className="w-full rounded-2xl border border-red-100 bg-red-50 py-8 text-sm font-medium text-red-600 hover:bg-red-100 transition-colors"
+                  >
+                    {tp.loadError}
+                  </button>
+                )}
+
+                {myStatus === "ready" && myPackets.length === 0 && (
+                  <div className="rounded-2xl border border-gray-100 bg-white/95 py-8 text-center text-sm text-gray-500">
+                    {tp.empty}
+                  </div>
+                )}
+
+                {myPackets.length > 0 && (
                 <div className="space-y-3">
                   {myPackets.map((item) => (
                     <div
@@ -122,6 +147,7 @@ export default function PacketIndexPage() {
                     </div>
                   ))}
                 </div>
+                )}
               </div>
             )}
 

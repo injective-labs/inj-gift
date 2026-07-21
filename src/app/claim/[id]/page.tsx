@@ -13,7 +13,7 @@ import { useTx } from "../../../hooks/useTx";
 import { normalizeError } from "../../../domain/normalizeError";
 import type { GiftPacket } from "../../../domain/types";
 import { useI18n, errorMessage } from "@/i18n";
-import { claimPacketReference } from "@/features/claim/gaslessClaim";
+import { claimPacketReference, waitForClaimReceipt } from "@/features/claim/gaslessClaim";
 import { resolvePacketReference } from "@/features/my-packets/client";
 import { formatShareText, parseSharePasscode } from "@/features/share/shareText";
 
@@ -122,6 +122,7 @@ export default function ClaimPage() {
               reference: packetId,
               password,
               adapter,
+              waitForReceipt: waitForClaimReceipt,
             })
           : await adapter.claimPacket({ id: packetId, password });
         amount = res.claimAmount;
