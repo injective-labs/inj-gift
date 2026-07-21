@@ -95,17 +95,21 @@ export class InjGiftContractWrapper {
         txKeys: Object.keys(tx),
       });
 
-      // Wait for tx to be mined so we can extract packetId from receipt logs.
-      // UI stays in "创建中..." until the tx is confirmed on-chain.
+      // Wait for the tx to be mined so we can extract packetId from receipt
+      // logs (needed for the share link/code). Bounded by a timeout: on a
+      // healthy chain the receipt lands in a couple of seconds, but a stalled
+      // receipt poll must never hang the caller forever (e.g. inside a headless
+      // agent iframe). On timeout we return the hash with no packetId and let
+      // the caller surface a "submitted, verify later" state.
       let packetId: string | undefined;
       let receipt: unknown;
       if (tx.wait) {
-        receipt = await tx.wait();
-        console.log('[inj-gift] tx.wait() resolved, receipt:', receipt);
-        packetId = this.extractPacketId(receipt as { logs?: Array<unknown> });
-        console.log('[inj-gift] extracted packetId:', packetId);
-      } else {
-        console.warn('[inj-gift] tx.wait is NOT available — cannot get receipt/packetId');
+        receipt = await waitWithTimeout(tx.wait(), 30_000);
+        if (receipt) {
+          packetId = this.extractPacketId(receipt as { logs?: Array<unknown> });
+        } else {
+          console.warn('[inj-gift] createRedPacket receipt not observed in time; returning hash only');
+        }
       }
       return { hash: tx.hash, receipt, packetId };
     } catch (e: unknown) {
@@ -223,6 +227,25 @@ export class InjGiftContractWrapper {
       }
       throw appError("RPC_ERROR", "Failed to refund packet", { cause: e });
     }
+  }
+}
+
+/**
+ * Resolve with the awaited value, or `undefined` if it doesn't settle within
+ * `timeoutMs`. Never rejects on timeout; the underlying promise keeps running
+ * (its result is simply ignored), so a stalled receipt poll can't hang callers.
+ */
+async function waitWithTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T | undefined> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<undefined>((resolve) => {
+        timer = setTimeout(() => resolve(undefined), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }
 
