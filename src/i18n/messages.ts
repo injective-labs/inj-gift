@@ -42,6 +42,7 @@ const zh = {
   },
   form: {
     packetId: "红包 ID",
+    shareCode: "分享码",
     amountInj: "总金额（INJ）",
     count: "红包份数",
     token: "Token 类型",
@@ -341,6 +342,7 @@ const en: Dict = {
   },
   form: {
     packetId: "Packet ID",
+    shareCode: "Share code",
     amountInj: "Total amount (INJ)",
     count: "Packet slots",
     token: "Token type",
@@ -638,6 +640,7 @@ const ja: Dict = {
   },
   form: {
     packetId: "紅包 ID",
+    shareCode: "共有コード",
     amountInj: "合計金額（INJ）",
     count: "受取枠",
     token: "トークン種別",
@@ -935,6 +938,7 @@ const ko: Dict = {
   },
   form: {
     packetId: "패킷 ID",
+    shareCode: "공유 코드",
     amountInj: "총 금액(INJ)",
     count: "수령 슬롯",
     token: "토큰 유형",

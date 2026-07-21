@@ -40,6 +40,7 @@ export default function CreatePage() {
   const [createdTxHash, setCreatedTxHash] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedShareCode, setCopiedShareCode] = useState(false);
 
   const { recordCreatedPacket } = useMyPackets();
 
@@ -131,6 +132,13 @@ export default function CreatePage() {
     await navigator.clipboard.writeText(createdPacketId);
     setCopiedId(true);
     setTimeout(() => setCopiedId(false), 1500);
+  };
+
+  const copyShareCode = async () => {
+    if (!createdShareCode) return;
+    await navigator.clipboard.writeText(createdShareCode);
+    setCopiedShareCode(true);
+    setTimeout(() => setCopiedShareCode(false), 1500);
   };
 
   const copyClaimLink = async () => {
@@ -346,20 +354,30 @@ export default function CreatePage() {
         <div className="space-y-4">
           {createdPacketId ? (
             <div className="rounded-2xl bg-emerald-50 p-4 border border-emerald-100">
-              <div className="text-xs font-semibold text-emerald-700">{form.packetId}</div>
-              <div className="mt-2 flex items-center gap-2 rounded-xl bg-white/80 px-3 py-2">
-                <span className="text-xs font-mono text-emerald-900/80 truncate">
-                  {shortenId(createdPacketId, 10)}
-                </span>
-                <button
-                  type="button"
-                  onClick={copyPacketId}
-                  className="ml-auto inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:text-emerald-900"
-                >
-                  {copiedId ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                  {copiedId ? common.copied : common.copy}
-                </button>
-              </div>
+              {/* Hero: the short share code — the primary thing to hand to others */}
+              {createdShareCode ? (
+                <div className="rounded-2xl bg-white/90 px-4 py-5 text-center border border-emerald-100">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-emerald-600">
+                    {form.shareCode}
+                  </div>
+                  <div className="mt-2 flex items-center justify-center gap-3">
+                    <span className="text-4xl font-extrabold tracking-[0.15em] text-emerald-900">
+                      {createdShareCode}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={copyShareCode}
+                      title={common.copy}
+                      className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
+                    >
+                      {copiedShareCode ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                      {copiedShareCode ? common.copied : common.copy}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Share link (uses the short code when available) */}
               <div className="mt-3 flex items-center gap-2 rounded-xl bg-white/80 px-3 py-2">
                 <span className="text-xs font-mono text-emerald-900/80 truncate">
                   {`/claim/${createdShareCode ?? shortenId(createdPacketId, 6)}`}
@@ -373,6 +391,23 @@ export default function CreatePage() {
                   {copiedLink ? common.copied : common.copyShareLink}
                 </button>
               </div>
+
+              {/* Full packet id — secondary, for anyone who needs the on-chain id */}
+              <div className="mt-2 flex items-center gap-2 rounded-xl bg-white/50 px-3 py-1.5">
+                <span className="text-[11px] font-semibold text-emerald-900/40">{form.packetId}</span>
+                <span className="text-[11px] font-mono text-emerald-900/50 truncate">
+                  {shortenId(createdPacketId, 6)}
+                </span>
+                <button
+                  type="button"
+                  onClick={copyPacketId}
+                  className="ml-auto inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700/70 hover:text-emerald-900"
+                >
+                  {copiedId ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                  {copiedId ? common.copied : common.copy}
+                </button>
+              </div>
+
               <div className="mt-2 text-xs text-emerald-700">
                 {tc.shareHint}
               </div>
@@ -397,7 +432,7 @@ export default function CreatePage() {
             {createdPacketId && (
               <button
                 type="button"
-                onClick={() => router.push(`/packet/${createdPacketId}`)}
+                onClick={() => router.push(`/packet/${createdShareCode ?? createdPacketId}`)}
                 className="flex-1 rounded-xl bg-emerald-600 text-white font-semibold py-3 hover:bg-emerald-700 transition-colors"
               >
                 {common.viewPacketDetail}
