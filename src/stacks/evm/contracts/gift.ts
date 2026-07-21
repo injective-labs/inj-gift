@@ -1,10 +1,93 @@
-import { ethers, Contract, BrowserProvider, Signer, type Provider } from "ethers";
+import {
+  ethers,
+  Contract,
+  BrowserProvider,
+  Interface,
+  JsonRpcProvider,
+  Signer,
+  toBeHex,
+  type Provider,
+} from "ethers";
+import type { Eip1193Provider } from "@injpass/cli";
 import { appError } from "@/domain/errors";
-import type { DistributionMode, GiftPacket } from "@/domain/types";
-import { injGiftAddress } from "../config";
+import type { CreatePacketInput, DistributionMode, GiftPacket } from "@/domain/types";
+import { getEvmConfigOrThrow, injGiftAddress } from "../config";
 import abiRaw from "@/lib/abi/InjGift.json";
 
 const abi = abiRaw;
+
+/** Shared decoder for encoding calldata / parsing logs off a bare provider. */
+const giftInterface = new Interface(abi as ConstructorParameters<typeof Interface>[0]);
+
+/**
+ * Single-round-trip create for the INJ Pass mini-app.
+ *
+ * The normal `contract.createRedPacket(...)` path lets ethers populate the tx —
+ * nonce (`eth_getTransactionCount`), gas (`eth_estimateGas`), and fees — and
+ * inside the mini-app every one of those is a separate postMessage round-trip to
+ * the host, which is the classic "AI create hangs" cause. Here we encode the
+ * calldata locally and issue exactly ONE `eth_sendTransaction`; the host's viem
+ * wallet fills gas/nonce itself against the RPC. Returns the moment the tx is
+ * broadcast (hash only) — mirroring how Omisper returns as soon as a send is
+ * accepted, with no chain round-trip of its own.
+ */
+export async function broadcastCreatePacketSingleShot(
+  provider: Eip1193Provider,
+  from: string,
+  contractAddress: string,
+  params: CreatePacketInput,
+): Promise<{ hash: string }> {
+  const modeEnum = params.mode === "random" ? 0 : 1;
+  const data = giftInterface.encodeFunctionData("createRedPacket", [
+    params.token,
+    BigInt(params.amount),
+    BigInt(params.count),
+    params.password,
+    BigInt(params.durationSec),
+    modeEnum,
+  ]);
+  const tx: Record<string, string> = { from, to: contractAddress, data };
+  if (params.token === ethers.ZeroAddress) tx.value = toBeHex(BigInt(params.amount));
+  const hash = (await provider.request({
+    method: "eth_sendTransaction",
+    params: [tx],
+  })) as string;
+  if (!hash || typeof hash !== "string") {
+    throw appError("RPC_ERROR", "Create transaction was not broadcast (no hash returned).");
+  }
+  return { hash };
+}
+
+/**
+ * Resolve the on-chain packetId for a freshly broadcast create tx via a public
+ * RPC — reliable receipts, and it never touches the mini-app bridge. Bounded, so
+ * a slow chain degrades to "no id yet": the caller then hands back the tx hash
+ * and points the user at 我的红包 rather than hanging.
+ */
+export async function waitForCreatedPacketId(
+  hash: string,
+  timeoutMs = 12_000,
+): Promise<string | undefined> {
+  try {
+    const { rpcUrl } = getEvmConfigOrThrow();
+    if (!rpcUrl) return undefined;
+    const receipt = await new JsonRpcProvider(rpcUrl).waitForTransaction(hash, 1, timeoutMs);
+    for (const log of receipt?.logs ?? []) {
+      try {
+        const parsed = giftInterface.parseLog(log as unknown as { topics: string[]; data: string });
+        if (parsed?.name === "RedPacketCreated") {
+          const id = (parsed as { args?: Record<string, unknown> }).args?.id;
+          if (id) return String(id);
+        }
+      } catch {
+        continue;
+      }
+    }
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 type TxLike = { hash: string; wait?: () => Promise<{ logs?: Array<unknown> }> };
 
@@ -79,15 +162,34 @@ export class InjGiftContractWrapper {
         ? { value: BigInt(params.amount) }
         : {};
 
-      const tx = (await this.contract.createRedPacket(
-        params.token,
-        BigInt(params.amount),
-        BigInt(params.count),
-        params.password,
-        BigInt(params.durationSec),
-        modeEnum,
-        overrides,
-      )) as TxLike;
+      // Bound the broadcast itself, not just the receipt wait below. This
+      // `createRedPacket(...)` promise resolves only after ethers has estimated
+      // gas, fetched the nonce, signed, and broadcast — and inside the INJ Pass
+      // mini-app every one of those steps is a postMessage round-trip to the
+      // host. If any of them stalls, this await would otherwise hang forever
+      // (the website create path has no outer timeout to save it). Unlike
+      // Omisper's `conversation.send()` — a single local-key message with no
+      // chain round-trip — a red-packet create can't avoid the chain, so we at
+      // least refuse to block on it indefinitely.
+      const tx = (await waitWithTimeout(
+        this.contract.createRedPacket(
+          params.token,
+          BigInt(params.amount),
+          BigInt(params.count),
+          params.password,
+          BigInt(params.durationSec),
+          modeEnum,
+          overrides,
+        ) as Promise<TxLike>,
+        45_000,
+      ));
+      if (!tx) {
+        throw appError(
+          "RPC_ERROR",
+          "Create transaction was not broadcast in time. It may still go through — check 我的红包 / My Packets before retrying.",
+          { messageKey: "createBroadcastTimeout" },
+        );
+      }
 
       console.log('[inj-gift] createRedPacket tx returned:', {
         hash: tx.hash,

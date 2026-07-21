@@ -7,9 +7,15 @@ import type {
   TxResult,
 } from "@/domain/types";
 import { EvmWallet } from "./wallet";
-import { InjGiftContractWrapper } from "./contracts/gift";
+import {
+  InjGiftContractWrapper,
+  broadcastCreatePacketSingleShot,
+  waitForCreatedPacketId,
+} from "./contracts/gift";
 import { JsonRpcProvider } from "ethers";
-import { getEvmConfigOrThrow } from "./config";
+import { getEvmConfigOrThrow, injGiftAddress } from "./config";
+import { isInjpassMiniAppHost } from "@/wallet/injpass/hostProvider";
+import { connectInjpass } from "@/wallet/injpass/provider";
 
 export class EvmGiftAdapter implements GiftAdapter {
   readonly stack = "evm" as const;
@@ -58,6 +64,24 @@ export class EvmGiftAdapter implements GiftAdapter {
   }
 
   async createPacket(input: CreatePacketInput): Promise<TxResult> {
+    // INJ Pass mini-app: broadcast in a single round-trip instead of letting
+    // ethers fan out into nonce/estimateGas/feeData calls over the iframe↔host
+    // bridge (the classic AI-create hang). packetId is then resolved off the
+    // bridge via a public RPC, bounded — so a slow chain never hangs the agent.
+    if (isInjpassMiniAppHost()) {
+      if (!injGiftAddress) {
+        throw appError("INVALID_INPUT", "EVM contract address not configured.");
+      }
+      const { provider, address } = await connectInjpass();
+      const { hash } = await broadcastCreatePacketSingleShot(
+        provider,
+        address,
+        injGiftAddress,
+        input,
+      );
+      const packetId = await waitForCreatedPacketId(hash);
+      return { hash, stack: "evm", packetId };
+    }
     await this.ensureConnected();
     const { hash, packetId, receipt } = await this.contract!.createPacket(input);
     return { hash, stack: "evm", packetId, receipt };

@@ -267,6 +267,7 @@ function FeatureDetailPanel({
   const [createdShareCode, setCreatedShareCode] = useState<string | null>(null);
   const [createdTxHash, setCreatedTxHash] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState(false);
+  const [copiedShareCode, setCopiedShareCode] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [claimPacketId, setClaimPacketId] = useState("");
   const [claimPassword, setClaimPassword] = useState("");
@@ -368,6 +369,13 @@ function FeatureDetailPanel({
     await navigator.clipboard.writeText(createdPacketId);
     setCopiedId(true);
     setTimeout(() => setCopiedId(false), 1500);
+  };
+
+  const copyShareCode = async () => {
+    if (!createdShareCode) return;
+    await navigator.clipboard.writeText(createdShareCode);
+    setCopiedShareCode(true);
+    setTimeout(() => setCopiedShareCode(false), 1500);
   };
 
   const copyClaimLink = async () => {
