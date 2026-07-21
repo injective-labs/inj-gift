@@ -756,7 +756,8 @@ function FeatureDetailPanel({
                 {panels.mine.empty}
               </div>
             ) : (
-              myPackets.slice(0, 3).map((item) => (
+              <div className="max-h-96 space-y-3 overflow-y-auto pr-1">
+                {myPackets.map((item) => (
                 <div
                   key={item.packetId}
                   className="rounded-lg border border-amber-900/10 bg-white/70 p-4"
@@ -791,7 +792,8 @@ function FeatureDetailPanel({
                     </div>
                   </div>
                 </div>
-              ))
+                ))}
+              </div>
             )}
           </div>
         </div>
