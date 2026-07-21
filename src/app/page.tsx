@@ -27,7 +27,8 @@ import { toast } from "sonner";
 import { useGiftAdapter } from "@/hooks/useGiftAdapter";
 import { useTx } from "@/hooks/useTx";
 import { shortenId } from "@/lib/utils";
-import { claimPacketReference } from "@/features/claim/gaslessClaim";
+import { claimPacketReference, waitForClaimReceipt } from "@/features/claim/gaslessClaim";
+import { formatEther } from "ethers";
 import { useMyPackets } from "@/features/my-packets/useMyPackets";
 import { formatShareText } from "@/features/share/shareText";
 import {
@@ -44,6 +45,15 @@ import {
 
 type FeatureType = "create" | "claim" | "mine";
 type PacketMode = "random" | "equal";
+
+/** Format a raw wei claim amount as a human-readable INJ value (falls back to the raw string). */
+function formatClaimInj(raw: string): string {
+  try {
+    return formatEther(BigInt(raw));
+  } catch {
+    return raw;
+  }
+}
 
 type FeaturedPacket = {
   mode: PacketMode;
@@ -399,6 +409,7 @@ function FeatureDetailPanel({
               reference: id,
               password: claimPassword,
               adapter,
+              waitForReceipt: waitForClaimReceipt,
             })
           : await adapter.claimPacket({ id, password: claimPassword });
         amount = res.claimAmount;
@@ -672,9 +683,14 @@ function FeatureDetailPanel({
           {(claimTxHash || claimAmount) && (
             <div className="rounded-lg border border-emerald-700/15 bg-emerald-50/80 p-4 text-sm font-semibold text-emerald-800">
               {claimAmount && (
-                <p>
-                  {panels.claim.claimAmount}：{claimAmount} {panels.claim.rawUnit}
-                </p>
+                <>
+                  <p className="text-lg">
+                    {panels.claim.claimAmount}：{formatClaimInj(claimAmount)} INJ
+                  </p>
+                  <p className="text-xs font-normal text-emerald-700/70">
+                    {panels.claim.rawUnit}: {claimAmount}
+                  </p>
+                </>
               )}
               {claimTxHash && <p>{common.txHash}：{shortenId(claimTxHash, 10)}</p>}
             </div>

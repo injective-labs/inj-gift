@@ -1,8 +1,8 @@
-import { BrowserProvider, Contract, Interface, keccak256, toUtf8Bytes } from "ethers";
+import { BrowserProvider, Contract, Interface, JsonRpcProvider, keccak256, toUtf8Bytes } from "ethers";
 import type { Eip1193Provider } from "@injpass/cli";
 import type { GiftAdapter } from "@/domain/giftAdapter";
 import { resolvePacketReference } from "@/features/my-packets/client";
-import { injGiftAddress } from "@/stacks/evm/config";
+import { getEvmConfigOrThrow, injGiftAddress } from "@/stacks/evm/config";
 import { connectInjpass } from "@/wallet/injpass/provider";
 
 type ConnectedWallet = {
@@ -66,17 +66,29 @@ function isReverted(receipt: ClaimReceipt | null): boolean {
 }
 
 /**
- * Production receipt waiter: polls the connected wallet's RPC until the relayed
- * claim tx is mined (or a timeout elapses). Timeouts degrade gracefully to
- * `null` so a slow RPC doesn't turn an accepted claim into a fake failure.
+ * Production receipt waiter for the relayed claim tx. Prefers a direct public
+ * RPC — its `eth_getTransactionReceipt` is reliable — over the wallet provider,
+ * because embedded wallets (e.g. the INJ Pass provider) may not poll receipts,
+ * which previously left the claimed amount blank. Falls back to the wallet
+ * provider, and degrades to `null` on timeout so a slow RPC never turns an
+ * accepted claim into a fake failure.
  */
 export const waitForClaimReceipt = async (
   hash: string,
   provider: Eip1193Provider,
 ): Promise<ClaimReceipt | null> => {
   try {
+    const { rpcUrl } = getEvmConfigOrThrow();
+    if (rpcUrl) {
+      const receipt = await new JsonRpcProvider(rpcUrl).waitForTransaction(hash, 1, 30_000);
+      if (receipt) return receipt as unknown as ClaimReceipt;
+    }
+  } catch {
+    // fall through to the wallet provider
+  }
+  try {
     const browserProvider = new BrowserProvider(provider);
-    return (await browserProvider.waitForTransaction(hash, 1, 60_000)) as
+    return (await browserProvider.waitForTransaction(hash, 1, 20_000)) as
       | ClaimReceipt
       | null;
   } catch {

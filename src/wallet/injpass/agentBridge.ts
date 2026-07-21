@@ -2,7 +2,7 @@ import { ethers } from "ethers";
 import { syncCreatedPacket } from "@/client/gift/packetSync";
 import { rememberPacketPasscode } from "@/client/gift/passcodeStore";
 import type { GiftAdapter } from "@/domain/giftAdapter";
-import { claimPacketReference } from "@/features/claim/gaslessClaim";
+import { claimPacketReference, waitForClaimReceipt } from "@/features/claim/gaslessClaim";
 import { resolvePacketReference } from "@/features/my-packets/client";
 import { formatShareText } from "@/features/share/shareText";
 import type { InjPassHostSession } from "@/wallet/injpass/hostProvider";
@@ -173,6 +173,7 @@ export async function executeInjGiftAgentCommand(
         reference: params.packetReference,
         password: params.password.trim(),
         adapter: dependencies.adapter,
+        waitForReceipt: waitForClaimReceipt,
       });
       return {
         ok: true,
