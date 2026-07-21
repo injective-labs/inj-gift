@@ -597,6 +597,30 @@ function FeatureDetailPanel({
             <div className="rounded-lg border border-emerald-700/15 bg-emerald-50/80 p-4">
               {createdPacketId && (
                 <div className="flex flex-col gap-2">
+                  {/* Big, permanent share code — the short id people actually pass
+                      around. Kept dominant over the long packet id below. */}
+                  <div className="rounded-xl border-2 border-emerald-500/40 bg-white/90 px-4 py-3 text-center">
+                    <p className="text-xs font-bold uppercase tracking-wide text-emerald-700/70">
+                      {form.shareCode}
+                    </p>
+                    {createdShareCode ? (
+                      <div className="mt-1 flex flex-wrap items-center justify-center gap-3">
+                        <span className="select-all font-mono text-4xl font-extrabold tracking-[0.15em] text-emerald-900">
+                          {createdShareCode}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={copyShareCode}
+                          className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2.5 py-1.5 text-xs font-bold text-white"
+                        >
+                          {copiedShareCode ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                          {copiedShareCode ? common.copied : common.copy}
+                        </button>
+                      </div>
+                    ) : (
+                      <p className="mt-1 font-mono text-sm text-emerald-800/60">…</p>
+                    )}
+                  </div>
                   <p className="text-sm font-bold text-emerald-800">
                     {form.packetId}
                   </p>
