@@ -3,8 +3,9 @@ export function formatShareText({
   passcode,
 }: {
   url: string;
-  passcode: string;
+  passcode?: string;
 }): string {
+  if (!passcode) return url;
   const shareUrl = new URL(url);
   shareUrl.hash = new URLSearchParams({ passcode }).toString();
   return shareUrl.toString();

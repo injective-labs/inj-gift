@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { Interface } from "ethers";
 import type { GiftAdapter } from "@/domain/giftAdapter";
 import { claimPacketGasless, claimPacketReference } from "./gaslessClaim";
 
@@ -41,6 +42,51 @@ describe("claimPacketGasless", () => {
       expect.objectContaining({ method: "POST" }),
     );
     expect(result.hash).toBe(`0x${"44".repeat(32)}`);
+  });
+
+  it("reads the claimed amount from the confirmed relay transaction", async () => {
+    const address = "0x1111111111111111111111111111111111111111";
+    const contractAddress = "0x294cDD0Ac5B2ef8b23E2dc3A993E133356Ee72D5";
+    const packetId = `0x${"22".repeat(32)}`;
+    const transactionHash = `0x${"44".repeat(32)}`;
+    const giftInterface = new Interface([
+      "event RedPacketClaimed(bytes32 indexed id,address indexed claimer,uint256 amount)",
+    ]);
+    const event = giftInterface.encodeEventLog(
+      giftInterface.getEvent("RedPacketClaimed")!,
+      [packetId, address, 123000000000000000n],
+    );
+    const receipt = {
+      status: 1,
+      logs: [{
+        address: contractAddress,
+        data: event.data,
+        topics: event.topics,
+      }],
+    };
+
+    await expect(
+      claimPacketGasless(
+        { packetId, password: "lucky", contractAddress, chainId: 1776 },
+        {
+          connect: vi.fn().mockResolvedValue({
+            address,
+            provider: {
+              request: vi.fn().mockResolvedValue(`0x${"33".repeat(65)}`),
+            },
+          }),
+          readNonce: vi.fn().mockResolvedValue(0n),
+          fetcher: vi.fn().mockResolvedValue(
+            Response.json({ transactionHash }),
+          ),
+          waitForReceipt: vi.fn().mockResolvedValue(receipt),
+        },
+      ),
+    ).resolves.toEqual({
+      hash: transactionHash,
+      receipt,
+      claimAmount: "123000000000000000",
+    });
   });
 
   it("calls the browser fetch implementation with the global context", async () => {

@@ -21,12 +21,11 @@ export default function PacketIndexPage() {
   const copyClaimLink = async (id: string) => {
     const item = myPackets.find((packet) => packet.packetId === id);
     const passcode = item ? getPacketPasscode(item) : null;
-    if (!passcode) {
-      toast.error(errors.enterPasscode);
-      return;
-    }
     const link = `${window.location.origin}/claim/${item?.shareCode ?? id}`;
-    await navigator.clipboard.writeText(formatShareText({ url: link, passcode }));
+    await navigator.clipboard.writeText(formatShareText({
+      url: link,
+      passcode: passcode ?? undefined,
+    }));
     toast.success(errors.copyShareSuccess);
   };
 

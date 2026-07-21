@@ -417,14 +417,10 @@ function FeatureDetailPanel({
     shareCode?: string;
   }) => {
     const passcode = getPacketPasscode(item);
-    if (!passcode) {
-      toast.error(errors.enterPasscode);
-      return;
-    }
     const reference = item.shareCode ?? item.packetId;
     await navigator.clipboard.writeText(formatShareText({
       url: `${window.location.origin}/claim/${reference}`,
-      passcode,
+      passcode: passcode ?? undefined,
     }));
     toast.success(errors.copyLinkSuccess);
   };

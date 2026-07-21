@@ -11,6 +11,14 @@ describe("formatShareText", () => {
     ).toBe("https://gift.injpass.com/claim/3kP9xQ7m#passcode=lucky+gift");
   });
 
+  it("returns the plain claim URL when no passcode is available", () => {
+    expect(
+      formatShareText({
+        url: "https://gift.injpass.com/claim/3kP9xQ7m",
+      }),
+    ).toBe("https://gift.injpass.com/claim/3kP9xQ7m");
+  });
+
   it("restores the passcode from a share URL fragment", () => {
     expect(parseSharePasscode("#passcode=lucky+gift")).toBe("lucky gift");
   });
