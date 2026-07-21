@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { WalletButton } from "../../components/WalletButton";
 import { ArrowLeft, Key, Search } from "lucide-react";
 import { toast } from "sonner";
-import { isBytes32Hex } from "../../lib/utils";
+import { isBytes32Hex, isShareCode, extractPacketReference } from "../../lib/utils";
 import { useGiftAdapter } from "../../hooks/useGiftAdapter";
 import { useI18n } from "@/i18n";
 
@@ -19,16 +19,25 @@ export default function ClaimIndexPage() {
   const [packetId, setPacketId] = useState("");
 
   const goClaim = () => {
-    const id = packetId.trim();
-    if (!id) {
+    const raw = packetId.trim();
+    if (!raw) {
       toast.error(errors.enterPacketId);
       return;
     }
-    if (isEvm && !isBytes32Hex(id)) {
+    // Accept a full packet id, an 8-char share code, or a pasted share link.
+    const reference = extractPacketReference(raw);
+    if (isEvm && !isBytes32Hex(reference) && !isShareCode(reference)) {
       toast.error(errors.invalidPacketId);
       return;
     }
-    router.push(`/claim/${id}`);
+    // Preserve a passcode carried in a pasted link's hash (#passcode=...).
+    let hash = "";
+    try {
+      hash = new URL(raw).hash;
+    } catch {
+      hash = "";
+    }
+    router.push(`/claim/${reference}${hash}`);
   };
 
   return (
@@ -73,7 +82,7 @@ export default function ClaimIndexPage() {
                 </label>
                 <input
                   className="w-full px-4 py-4 border-2 border-gray-200 rounded-xl focus:border-yellow-400 focus:ring-4 focus:ring-yellow-100 outline-none transition-all text-lg group-hover:border-gray-300"
-                  placeholder={isEvm ? "0x..." : common.packetIdPlaceholder}
+                  placeholder={isEvm ? common.claimRefPlaceholder : common.packetIdPlaceholder}
                   value={packetId}
                   onChange={(e) => setPacketId(e.target.value)}
                   onKeyDown={(e) => {
